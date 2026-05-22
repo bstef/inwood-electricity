@@ -679,6 +679,94 @@
   .d4 { animation-delay: 0.20s; }
   .d5 { animation-delay: 0.25s; }
 
+  /* ── Rate estimator row ──────────────────────────────────────────────── */
+  .rate-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .rate-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+  .rate-field { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+  .rate-field input {
+    width: 62px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    text-align: right;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .rate-field input:focus { border-color: var(--accent); }
+  .rate-hint { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent); }
+
+  /* ── Chart period selector ───────────────────────────────────────────── */
+  .period-btns { display: flex; gap: 4px; }
+  .pp {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .pp:hover { border-color: var(--border2); color: var(--text); }
+  .pp.active { border-color: var(--accent); color: var(--accent); background: var(--accent-active-bg); }
+
+  /* ── Export button ───────────────────────────────────────────────────── */
+  .export-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .export-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-hover-bg); }
+
+  /* ── Year-over-year ──────────────────────────────────────────────────── */
+  .yoy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 36px;
+  }
+  .yoy-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .yoy-card:hover { border-color: var(--border2); }
+  .yoy-year { font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 600; margin-bottom: 14px; }
+  .yoy-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .yoy-stat-lbl { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+  .yoy-stat-val { font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 600; }
+  .yoy-months { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+
+  /* ── Rolling avg legend dot ──────────────────────────────────────────── */
+  .li.avg-li .avg-dash {
+    width: 16px; height: 2px;
+    background: var(--text);
+    border-radius: 1px;
+    opacity: 0.5;
+  }
+
   @media (max-width: 600px) {
     .page { padding: 0 14px 40px; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -727,6 +815,15 @@
     <div class="section-label">Overview</div>
     <div class="stats-grid" id="statsGrid"></div>
 
+    <!-- Rate estimator -->
+    <div class="rate-row">
+      <span class="rate-label">Rate:</span>
+      <label class="rate-field">
+        $<input type="number" id="rateInput" value="0.18" min="0.01" max="2" step="0.01" oninput="onRateChange()"> /kWh
+      </label>
+      <span class="rate-hint" id="rateHint"></span>
+    </div>
+
     <!-- Filter pills -->
     <div class="filters">
       <span class="filter-label">SHOW:</span>
@@ -741,13 +838,22 @@
     <div class="chart-card fade-up d2">
       <div class="chart-hd">
         <div>
-          <div class="chart-title">Consumption Alerts <small>days exceeding 15 kWh threshold</small></div>
+          <div class="chart-title">Consumption Alerts <small id="chartPeriodLabel">days exceeding 15 kWh threshold</small></div>
         </div>
-        <div class="legend">
-          <div class="li"><div class="ld" style="background:var(--c-ok)"></div>15–20</div>
-          <div class="li"><div class="ld" style="background:var(--c-mid)"></div>20–35</div>
-          <div class="li"><div class="ld" style="background:var(--c-high)"></div>35–50</div>
-          <div class="li"><div class="ld" style="background:var(--c-crit)"></div>50+</div>
+        <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+          <div class="period-btns">
+            <button class="pp" onclick="setChartPeriod(30,this)">30d</button>
+            <button class="pp" onclick="setChartPeriod(90,this)">90d</button>
+            <button class="pp" onclick="setChartPeriod(365,this)">1y</button>
+            <button class="pp active" onclick="setChartPeriod(0,this)">All</button>
+          </div>
+          <div class="legend">
+            <div class="li"><div class="ld" style="background:var(--c-ok)"></div>15–20</div>
+            <div class="li"><div class="ld" style="background:var(--c-mid)"></div>20–35</div>
+            <div class="li"><div class="ld" style="background:var(--c-high)"></div>35–50</div>
+            <div class="li"><div class="ld" style="background:var(--c-crit)"></div>50+</div>
+            <div class="li avg-li"><div class="avg-dash"></div>30d avg</div>
+          </div>
         </div>
       </div>
       <div class="chart-scroll">
@@ -765,12 +871,19 @@
     <div class="section-label" style="margin-top:28px;">Monthly Summary</div>
     <div class="monthly-grid" id="monthlyGrid"></div>
 
+    <!-- Year-over-year -->
+    <div class="section-label" style="margin-top:28px;">Year Summary</div>
+    <div class="yoy-grid" id="yoyGrid"></div>
+
     <!-- Table -->
     <div class="section-label">Alert Log</div>
     <div class="table-card fade-up d4">
       <div class="table-head">
         <div class="table-title">All Records <small id="tableCount"></small></div>
-        <input class="search" id="searchBox" placeholder="Search date, kWh, type…" oninput="onSearch()">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input class="search" id="searchBox" placeholder="Search date, kWh, type…" oninput="onSearch()">
+          <button class="export-btn" onclick="exportCSV()">↓ CSV</button>
+        </div>
       </div>
       <table>
         <thead>
@@ -825,6 +938,7 @@ function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   document.getElementById('themeBtn').textContent = theme === 'dark' ? '🌙' : '☀️';
   localStorage.setItem('theme', theme);
+  if (allReadings.length) renderChart();
 }
 
 function toggleTheme() {
@@ -883,6 +997,8 @@ let sortDir = 'desc';
 let page = 1;
 const PAGE_SIZE = 25;
 let searchVal = '';
+let chartPeriod = 0;   // days; 0 = all
+let kwhRate = 0.18;
 
 // ── Data loading ───────────────────────────────────────────────────────────────
 async function loadData(forceRefresh = false) {
@@ -936,7 +1052,9 @@ function render() {
   renderStats();
   renderChart();
   renderMonthly();
+  renderYoY();
   applyFilters();
+  updateRateHint();
 }
 
 // ── Stats ──────────────────────────────────────────────────────────────────────
@@ -955,10 +1073,13 @@ function renderStats() {
   daily.forEach(r => { const k = r.date.slice(0,7); mCounts[k] = (mCounts[k]||0)+1; });
   const hotM = Object.entries(mCounts).reduce((a,b) => b[1]>a[1]?b:a, ['',0]);
 
+  const estPeakCost = peakDay ? (peakDay.kwh * kwhRate).toFixed(2) : null;
+  const estAvgCost  = (avgDaily * kwhRate).toFixed(2);
+
   const stats = [
     { label: 'Total Alerts',      val: totalAlerts,                 sub: 'notifications', color: COLORS.ok },
-    { label: 'Peak Day',          val: peakDay  ? peakDay.kwh.toFixed(1)+' kWh' : '—', sub: peakDay ? fmtDate(peakDay.date) : '', color: COLORS.crit },
-    { label: 'Avg (Daily Alerts)',val: avgDaily.toFixed(1)+' kWh',  sub: 'per flagged day', color: COLORS.mid },
+    { label: 'Peak Day',          val: peakDay  ? peakDay.kwh.toFixed(1)+' kWh' : '—', sub: estPeakCost ? `≈ $${estPeakCost} · ${fmtDate(peakDay.date)}` : '', color: COLORS.crit },
+    { label: 'Avg (Daily Alerts)',val: avgDaily.toFixed(1)+' kWh',  sub: `≈ $${estAvgCost} per flagged day`, color: COLORS.mid },
     { label: 'Lowest Day',        val: minDay   ? minDay.kwh.toFixed(1)+' kWh' : '—', sub: minDay ? fmtDate(minDay.date) : '', color: COLORS.ok },
     { label: 'Monthly Record',    val: peakMon  ? peakMon.kwh.toFixed(0)+' kWh' : '—', sub: peakMon ? fmtDate(peakMon.date) : '', color: COLORS.monthly },
     { label: 'Busiest Month',     val: hotM[0]  ? fmtMonthFull(hotM[0]) : '—', sub: (hotM[1]||'') + ' daily alerts', color: COLORS.high },
@@ -975,12 +1096,29 @@ function renderStats() {
   `).join('');
 }
 
+// ── Chart period ───────────────────────────────────────────────────────────────
+function setChartPeriod(days, btn) {
+  chartPeriod = days;
+  document.querySelectorAll('.pp').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const label = days === 0 ? 'all time' : `last ${days} days`;
+  document.getElementById('chartPeriodLabel').textContent = `days exceeding 15 kWh threshold · ${label}`;
+  renderChart();
+}
+
 // ── Bar chart ──────────────────────────────────────────────────────────────────
 function renderChart() {
-  const daily = allReadings
+  let daily = allReadings
     .filter(r => r.type === 'daily')
     .slice()
     .sort((a,b) => a.date.localeCompare(b.date));
+
+  if (chartPeriod > 0) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - chartPeriod);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    daily = daily.filter(r => r.date >= cutoffStr);
+  }
 
   if (!daily.length) return;
 
@@ -1054,6 +1192,39 @@ function renderChart() {
 
     wrap.appendChild(col);
   });
+
+  drawRollingAvg(daily, maxKwh, usableH);
+}
+
+function drawRollingAvg(daily, maxKwh, usableH) {
+  const wrap = document.getElementById('barsWrap');
+  const n = daily.length;
+  if (n < 3) return;
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${n} ${usableH}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.style.cssText = `position:absolute;left:0;top:0;width:100%;height:${usableH}px;pointer-events:none;`;
+
+  const pts = daily.map((r, i) => {
+    const half = 14; // ±14 days window
+    const slice = daily.slice(Math.max(0, i - half), i + half + 1);
+    const avg = slice.reduce((a, b) => a + b.kwh, 0) / slice.length;
+    return `${i + 0.5},${(1 - avg / maxKwh) * usableH}`;
+  }).join(' ');
+
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  line.setAttribute('points', pts);
+  line.setAttribute('fill', 'none');
+  const isDark = document.documentElement.dataset.theme !== 'light';
+  line.setAttribute('stroke', isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)');
+  line.setAttribute('stroke-width', '0.4');
+  line.setAttribute('stroke-linecap', 'round');
+  line.setAttribute('stroke-linejoin', 'round');
+  svg.appendChild(line);
+
+  wrap.style.position = 'relative';
+  wrap.appendChild(svg);
 }
 
 // ── Monthly summary ────────────────────────────────────────────────────────────
@@ -1215,6 +1386,91 @@ function renderTable() {
     `Page ${page} of ${maxPage || 1}  (${filteredReadings.length} records)`;
   document.getElementById('prevBtn').disabled = page <= 1;
   document.getElementById('nextBtn').disabled = page >= maxPage;
+}
+
+// ── Year-over-year ─────────────────────────────────────────────────────────────
+function renderYoY() {
+  const daily = allReadings.filter(r => r.type === 'daily');
+  const byYear = {};
+  daily.forEach(r => {
+    const y = r.date.slice(0, 4);
+    if (!byYear[y]) byYear[y] = [];
+    byYear[y].push(r);
+  });
+
+  const grid = document.getElementById('yoyGrid');
+  grid.innerHTML = Object.entries(byYear)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([year, rows]) => {
+      const kwhs   = rows.map(r => r.kwh);
+      const avg    = kwhs.reduce((a, b) => a + b, 0) / kwhs.length;
+      const peak   = Math.max(...kwhs);
+      const peakR  = rows.find(r => r.kwh === peak);
+      const months = [...new Set(rows.map(r => r.date.slice(0, 7)))].sort();
+      const estCost = (avg * kwhRate).toFixed(2);
+      const col    = tierColor(avg, 'daily');
+      return `
+        <div class="yoy-card fade-up">
+          <div class="yoy-year" style="color:${col}">${year}</div>
+          <div class="yoy-stats">
+            <div>
+              <div class="yoy-stat-lbl">Alerts</div>
+              <div class="yoy-stat-val">${rows.length}</div>
+            </div>
+            <div>
+              <div class="yoy-stat-lbl">Avg kWh</div>
+              <div class="yoy-stat-val" style="color:${col}">${avg.toFixed(1)}</div>
+            </div>
+            <div>
+              <div class="yoy-stat-lbl">Peak day</div>
+              <div class="yoy-stat-val" style="color:${COLORS.crit}">${peak.toFixed(1)}</div>
+            </div>
+            <div>
+              <div class="yoy-stat-lbl">Est. avg cost</div>
+              <div class="yoy-stat-val">$${estCost}</div>
+            </div>
+          </div>
+          <div class="yoy-months">${months.map(m => fmtMonth(m + '-01')).join(' · ')}</div>
+        </div>
+      `;
+    }).join('');
+}
+
+// ── Rate estimator ─────────────────────────────────────────────────────────────
+function onRateChange() {
+  kwhRate = parseFloat(document.getElementById('rateInput').value) || 0.18;
+  renderStats();
+  renderYoY();
+  updateRateHint();
+}
+
+function updateRateHint() {
+  const daily = allReadings.filter(r => r.type === 'daily');
+  if (!daily.length) return;
+  const avg = daily.reduce((a, b) => a + b.kwh, 0) / daily.length;
+  const est = (avg * kwhRate * 30).toFixed(0);
+  document.getElementById('rateHint').textContent = `≈ $${est}/mo based on avg flagged days`;
+}
+
+// ── CSV export ─────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const headers = ['Date', 'kWh', 'Type', 'Month', 'Est Cost ($)', 'Over Threshold (kWh)'];
+  const rows = filteredReadings.map(r => [
+    r.date,
+    r.kwh,
+    r.type,
+    r.date.slice(0, 7),
+    (r.kwh * kwhRate).toFixed(2),
+    r.type === 'daily' ? (r.kwh - 15).toFixed(2) : '',
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `inwood-electricity-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
