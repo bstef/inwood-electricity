@@ -946,8 +946,6 @@ function toggleTheme() {
   applyTheme(current === 'dark' ? 'light' : 'dark');
 }
 
-initTheme();
-
 // ── Color helpers ──────────────────────────────────────────────────────────────
 const COLORS = {
   ok:      '#4dffb4',
@@ -999,6 +997,8 @@ const PAGE_SIZE = 25;
 let searchVal = '';
 let chartPeriod = 0;   // days; 0 = all
 let kwhRate = 0.18;
+
+initTheme();
 
 // ── Data loading ───────────────────────────────────────────────────────────────
 async function loadData(forceRefresh = false) {
