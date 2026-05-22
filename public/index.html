@@ -1430,7 +1430,7 @@ function renderYoY() {
               <div class="yoy-stat-val">$${estCost}</div>
             </div>
           </div>
-          <div class="yoy-months">${months.map(m => fmtMonth(m + '-01')).join(' · ')}</div>
+          <div class="yoy-months">${months.map(m => fmtMonth(m)).join(' · ')}</div>
         </div>
       `;
     }).join('');
