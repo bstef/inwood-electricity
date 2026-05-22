@@ -759,6 +759,31 @@
   .yoy-stat-val { font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 600; }
   .yoy-months { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 
+  /* ── Collapsible section ─────────────────────────────────────────────── */
+  .section-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 14px;
+  }
+  .section-toggle:hover .toggle-chevron { color: var(--accent); }
+  .toggle-chevron {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    transition: transform 0.25s, color 0.15s;
+  }
+  .toggle-chevron.open { transform: rotate(180deg); }
+  .collapsible {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.3s ease;
+  }
+  .collapsible.collapsed { grid-template-rows: 0fr; }
+  .collapsible > div { overflow: hidden; }
+
   /* ── Rolling avg legend dot ──────────────────────────────────────────── */
   .li.avg-li .avg-dash {
     width: 16px; height: 2px;
@@ -876,7 +901,12 @@
     <div class="yoy-grid" id="yoyGrid"></div>
 
     <!-- Table -->
-    <div class="section-label">Alert Log</div>
+    <div class="section-toggle section-label" onclick="toggleLog()">
+      <span>Alert Log</span>
+      <span class="toggle-chevron" id="logChevron">▲</span>
+    </div>
+    <div class="collapsible collapsed" id="logCollapsible">
+    <div>
     <div class="table-card fade-up d4">
       <div class="table-head">
         <div class="table-title">All Records <small id="tableCount"></small></div>
@@ -906,6 +936,8 @@
         </div>
       </div>
     </div>
+    </div><!-- /collapsible inner -->
+    </div><!-- /collapsible -->
 
     <footer>
       <div class="footer-left">
@@ -1471,6 +1503,15 @@ function exportCSV() {
   a.download = `inwood-electricity-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── Collapsible log ────────────────────────────────────────────────────────────
+function toggleLog() {
+  const col = document.getElementById('logCollapsible');
+  const chev = document.getElementById('logChevron');
+  const isOpen = !col.classList.contains('collapsed');
+  col.classList.toggle('collapsed', isOpen);
+  chev.classList.toggle('open', !isOpen);
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
