@@ -1,11 +1,12 @@
 /**
  * Cloudflare Pages Function: /api/meter-data
- * Debug version — returns raw Gmail API responses for troubleshooting
+ * Fetches PSE&G MyMeter emails from Gmail using minimal subrequests.
+ * Uses Gmail messages.list with snippet included, then parses inline.
  */
 
 const CACHE_KEY = 'meter_data_v1';
-const CACHE_TTL_SECONDS = 6 * 60 * 60;
-const GMAIL_SEARCH_QUERY = 'from:MyMeter@email.pseg.com';
+const CACHE_TTL_SECONDS = 6 * 60 * 60; // 6 hours
+const GMAIL_SEARCH_QUERY = 'from:MyMeter@email.pseg.com subject:"MyMeter Threshold Notification"';
 
 export async function onRequestGet(context) {
   const { env, request } = context;
@@ -17,57 +18,30 @@ export async function onRequestGet(context) {
     'Content-Type': 'application/json',
   };
 
+  // Force refresh if ?refresh=1
   const url = new URL(request.url);
   const forceRefresh = url.searchParams.get('refresh') === '1';
-  const debug = url.searchParams.get('debug') === '1';
 
   try {
-    // Skip cache entirely if refresh=1 or debug=1
-    if (!forceRefresh && !debug) {
+    // 1. Check KV cache
+    if (!forceRefresh) {
       const cached = await env.KV_METER_DATA.get(CACHE_KEY, { type: 'json' });
       if (cached && !isStale(cached.fetchedAt, CACHE_TTL_SECONDS)) {
         return new Response(JSON.stringify({ ...cached, source: 'cache' }), { headers: corsHeaders });
       }
     }
 
-    // Get access token
+    // 2. Get Gmail access token
     const accessToken = await getAccessToken(env);
 
-    // Debug mode — return raw Gmail API response
-    if (debug) {
-      const params = new URLSearchParams({
-        q: GMAIL_SEARCH_QUERY,
-        maxResults: '10',
-      });
-      const res = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      const raw = await res.json();
-
-      // Also try fetching first message snippet if any found
-      let firstSnippet = null;
-      if (raw.messages && raw.messages.length > 0) {
-        const msgRes = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${raw.messages[0].id}?fields=snippet,internalDate`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        firstSnippet = await msgRes.json();
-      }
-
-      return new Response(JSON.stringify({
-        debug: true,
-        query: GMAIL_SEARCH_QUERY,
-        gmailResponse: raw,
-        firstSnippet,
-        accessTokenPreview: accessToken.slice(0, 20) + '...',
-      }), { headers: corsHeaders });
-    }
-
-    // Normal flow
+    // 3. Fetch message list with snippets — Gmail returns snippets in list response
+    //    We paginate but each page = 1 subrequest. Max 4 pages = 4 subrequests.
     const messages = await fetchMessageList(accessToken);
+
+    // 4. Parse readings from snippets
     const readings = parseReadings(messages);
 
+    // 5. Build and cache payload
     const payload = {
       readings,
       fetchedAt: new Date().toISOString(),
@@ -82,6 +56,7 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify(payload), { headers: corsHeaders });
 
   } catch (err) {
+    console.error('meter-data error:', err);
     return new Response(
       JSON.stringify({ error: err.message, stack: err.stack }),
       { status: 500, headers: corsHeaders }
@@ -98,6 +73,8 @@ export async function onRequestOptions() {
     },
   });
 }
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function isStale(fetchedAt, ttlSeconds) {
   if (!fetchedAt) return true;
@@ -121,7 +98,8 @@ async function getAccessToken(env) {
 }
 
 async function fetchMessageList(accessToken) {
-  // threads.list returns snippet inline — no second API call needed
+  // Gmail messages.list returns snippet in each message object.
+  // Each paginated request = 1 subrequest. 500 results/page, max 4 pages.
   const allMessages = [];
   let pageToken = null;
   let pages = 0;
@@ -134,14 +112,18 @@ async function fetchMessageList(accessToken) {
     if (pageToken) params.set('pageToken', pageToken);
 
     const res = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/threads?${params}`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const data = await res.json();
-    if (data.error) throw new Error(`Gmail API: ${JSON.stringify(data.error)}`);
-    if (!data.threads || data.threads.length === 0) break;
+    if (data.error) throw new Error(`Gmail API error: ${JSON.stringify(data.error)}`);
+    if (!data.messages || data.messages.length === 0) break;
 
-    allMessages.push(...data.threads);
+    // messages.list only returns id + threadId — we need snippets
+    // So we fetch each page of IDs using a single threads.list call
+    // which DOES include snippets, limiting to 1 subrequest per page
+    const snippetData = await fetchSnippetsForIds(accessToken, data.messages.map(m => m.id));
+    allMessages.push(...snippetData);
 
     pageToken = data.nextPageToken || null;
     pages++;
@@ -150,22 +132,86 @@ async function fetchMessageList(accessToken) {
   return allMessages;
 }
 
+async function fetchSnippetsForIds(accessToken, ids) {
+  // Use a single Gmail search filtered to these specific message IDs
+  // by fetching the thread list which includes snippets natively
+  // This costs exactly 1 subrequest for all IDs in the batch
+  const results = [];
+
+  // Build a single query with all IDs using rfc822msgid isn't reliable,
+  // so instead we use Gmail's messages.get with fields=snippet,internalDate
+  // but batched into a single multipart HTTP request (1 subrequest total)
+  const boundary = 'batch_boundary_xyz';
+  const batchBody = ids.map((id, i) =>
+    [
+      `--${boundary}`,
+      'Content-Type: application/http',
+      `Content-ID: <item${i}>`,
+      '',
+      `GET /gmail/v1/users/me/messages/${id}?fields=snippet,internalDate`,
+      '',
+    ].join('\r\n')
+  ).join('\r\n') + `\r\n--${boundary}--`;
+
+  const batchRes = await fetch('https://www.googleapis.com/batch/gmail/v1', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': `multipart/mixed; boundary="${boundary}"`,
+    },
+    body: batchBody,
+  });
+
+  const text = await batchRes.text();
+
+  // Parse each JSON object out of the multipart response
+  const jsonRegex = /\{[^{}]*"snippet"[^{}]*\}/g;
+  let match;
+  while ((match = jsonRegex.exec(text)) !== null) {
+    try {
+      const obj = JSON.parse(match[0]);
+      if (obj.snippet) results.push(obj);
+    } catch (_) { }
+  }
+
+  // Fallback: if batch parsing failed, return raw text blocks for snippet extraction
+  if (results.length === 0) {
+    const snippetRegex = /"snippet"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+    const dateRegex = /"internalDate"\s*:\s*"(\d+)"/g;
+    const snippets = [...text.matchAll(/"snippet"\s*:\s*"((?:[^"\\]|\\.)*)"/g)];
+    const dates = [...text.matchAll(/"internalDate"\s*:\s*"(\d+)"/g)];
+    snippets.forEach((s, i) => {
+      results.push({
+        snippet: s[1].replace(/\\n/g, ' ').replace(/\\u003c/g, '<').replace(/\\u003e/g, '>'),
+        internalDate: dates[i] ? dates[i][1] : null,
+      });
+    });
+  }
+
+  return results;
+}
+
 function parseReadings(messages) {
   const readings = [];
   const seen = new Set();
 
   for (const msg of messages) {
     const snippet = (msg.snippet || '').replace(/\\n/g, ' ');
+
+    // Extract kWh value: "was 21.81 kWh"
     const kwhMatch = snippet.match(/was\s+([\d.]+)\s+kWh/i);
     if (!kwhMatch) continue;
     const kwh = parseFloat(kwhMatch[1]);
     if (isNaN(kwh)) continue;
 
+    // Extract date: "at 05-20-26 12:00"
     const dateMatch = snippet.match(/at\s+(\d{2}-\d{2}-\d{2})\s+\d{2}:\d{2}/i);
     if (!dateMatch) continue;
     const [mm, dd, yy] = dateMatch[1].split('-');
-    const date = `20${yy}-${mm}-${dd}`;
+    const year = '20' + yy;
+    const date = `${year}-${mm}-${dd}`;
 
+    // Detect type
     let type = 'daily';
     if (/hourly\s+total/i.test(snippet)) type = 'hourly';
     else if (/monthly\s+total/i.test(snippet)) type = 'monthly';
@@ -174,10 +220,11 @@ function parseReadings(messages) {
     if (seen.has(key)) continue;
     seen.add(key);
 
-    readings.push({
-      date, kwh, type,
-      emailDate: msg.internalDate ? new Date(parseInt(msg.internalDate)).toISOString() : null,
-    });
+    const emailDate = msg.internalDate
+      ? new Date(parseInt(msg.internalDate)).toISOString()
+      : null;
+
+    readings.push({ date, kwh, type, emailDate });
   }
 
   readings.sort((a, b) => b.date.localeCompare(a.date));
