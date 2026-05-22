@@ -6,7 +6,8 @@
 
 const CACHE_KEY = 'meter_data_v1';
 const CACHE_TTL_SECONDS = 6 * 60 * 60; // 6 hours
-const GMAIL_SEARCH_QUERY = 'from:MyMeter@email.pseg.com subject:"MyMeter Threshold Notification"';
+//const GMAIL_SEARCH_QUERY = 'from:MyMeter@email.pseg.com subject:"MyMeter Threshold Notification"';
+const GMAIL_SEARCH_QUERY = 'from:MyMeter@email.pseg.com';
 
 export async function onRequestGet(context) {
   const { env, request } = context;
@@ -171,18 +172,18 @@ async function fetchSnippetsForIds(accessToken, ids) {
     try {
       const obj = JSON.parse(match[0]);
       if (obj.snippet) results.push(obj);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // Fallback: if batch parsing failed, return raw text blocks for snippet extraction
   if (results.length === 0) {
     const snippetRegex = /"snippet"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
-    const dateRegex    = /"internalDate"\s*:\s*"(\d+)"/g;
+    const dateRegex = /"internalDate"\s*:\s*"(\d+)"/g;
     const snippets = [...text.matchAll(/"snippet"\s*:\s*"((?:[^"\\]|\\.)*)"/g)];
-    const dates    = [...text.matchAll(/"internalDate"\s*:\s*"(\d+)"/g)];
+    const dates = [...text.matchAll(/"internalDate"\s*:\s*"(\d+)"/g)];
     snippets.forEach((s, i) => {
       results.push({
-        snippet: s[1].replace(/\\n/g,' ').replace(/\\u003c/g,'<').replace(/\\u003e/g,'>'),
+        snippet: s[1].replace(/\\n/g, ' ').replace(/\\u003c/g, '<').replace(/\\u003e/g, '>'),
         internalDate: dates[i] ? dates[i][1] : null,
       });
     });
@@ -213,7 +214,7 @@ function parseReadings(messages) {
 
     // Detect type
     let type = 'daily';
-    if (/hourly\s+total/i.test(snippet))  type = 'hourly';
+    if (/hourly\s+total/i.test(snippet)) type = 'hourly';
     else if (/monthly\s+total/i.test(snippet)) type = 'monthly';
 
     const key = `${date}|${kwh}|${type}`;
