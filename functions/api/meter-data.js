@@ -121,6 +121,7 @@ async function getAccessToken(env) {
 }
 
 async function fetchMessageList(accessToken) {
+  // threads.list returns snippet inline — no second API call needed
   const allMessages = [];
   let pageToken = null;
   let pages = 0;
@@ -133,58 +134,20 @@ async function fetchMessageList(accessToken) {
     if (pageToken) params.set('pageToken', pageToken);
 
     const res = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/threads?${params}`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const data = await res.json();
     if (data.error) throw new Error(`Gmail API: ${JSON.stringify(data.error)}`);
-    if (!data.messages || data.messages.length === 0) break;
+    if (!data.threads || data.threads.length === 0) break;
 
-    const snippetData = await fetchSnippetsForIds(accessToken, data.messages.map(m => m.id));
-    allMessages.push(...snippetData);
+    allMessages.push(...data.threads);
 
     pageToken = data.nextPageToken || null;
     pages++;
   } while (pageToken && pages < 4);
 
   return allMessages;
-}
-
-async function fetchSnippetsForIds(accessToken, ids) {
-  const results = [];
-  const boundary = 'batch_boundary_xyz';
-  const batchBody = ids.map((id, i) =>
-    [
-      `--${boundary}`,
-      'Content-Type: application/http',
-      `Content-ID: <item${i}>`,
-      '',
-      `GET /gmail/v1/users/me/messages/${id}?fields=snippet,internalDate`,
-      '',
-    ].join('\r\n')
-  ).join('\r\n') + `\r\n--${boundary}--`;
-
-  const batchRes = await fetch('https://www.googleapis.com/batch/gmail/v1', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': `multipart/mixed; boundary="${boundary}"`,
-    },
-    body: batchBody,
-  });
-
-  const text = await batchRes.text();
-
-  const snippets = [...text.matchAll(/"snippet"\s*:\s*"((?:[^"\\]|\\.)*)"/g)];
-  const dates = [...text.matchAll(/"internalDate"\s*:\s*"(\d+)"/g)];
-  snippets.forEach((s, i) => {
-    results.push({
-      snippet: s[1].replace(/\\n/g, ' ').replace(/\\u003c/g, '<').replace(/\\u003e/g, '>'),
-      internalDate: dates[i] ? dates[i][1] : null,
-    });
-  });
-
-  return results;
 }
 
 function parseReadings(messages) {
