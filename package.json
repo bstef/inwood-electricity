@@ -1,0 +1,14 @@
+{
+  "name": "inwood-electricity",
+  "version": "1.0.0",
+  "description": "PSE&G MyMeter threshold notification dashboard — Cloudflare Pages + Workers",
+  "private": true,
+  "scripts": {
+    "dev":     "npx wrangler pages dev public --compatibility-date=2024-09-23",
+    "deploy":  "npx wrangler pages deploy public",
+    "secrets": "node scripts/set-secrets.js"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

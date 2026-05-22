@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inwood Electricity</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ──────────────────────────────────────────────────── */
+  :root {
+    --bg:        #08090d;
+    --surface:   #0f1117;
+    --surface2:  #161920;
+    --border:    #1c2030;
+    --border2:   #242838;
+    --accent:    #e8f54e;   /* electric lime */
+    --accent2:   #ff4d4d;   /* alert red     */
+    --accent3:   #4daaff;   /* info blue     */
+    --warn:      #ffaa33;   /* warning amber */
+    --text:      #dce4f0;
+    --muted:     #4a5568;
+    --muted2:    #2d3748;
+
+    /* usage tier colors */
+    --c-ok:      #4dffb4;
+    --c-mid:     #ffdd57;
+    --c-high:    #ff8c42;
+    --c-crit:    #ff4d4d;
+    --c-monthly: #4daaff;
+    --c-hourly:  #cc88ff;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Scanline texture overlay ───────────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(232,245,78,0.012) 2px,
+      rgba(232,245,78,0.012) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Layout ─────────────────────────────────────────────────────────── */
+  .page { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding: 0 28px 60px; }
+
+  /* ── Top bar ────────────────────────────────────────────────────────── */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0 18px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .logo-text {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .logo-name {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    line-height: 1;
+  }
+  .logo-name span { color: var(--accent); }
+
+  .logo-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    margin-top: 3px;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px;
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--c-ok);
+    box-shadow: 0 0 6px var(--c-ok);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .status-dot.loading { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+  .status-dot.error   { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); animation: none; }
+
+  .refresh-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .refresh-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(232,245,78,0.06);
+  }
+  .refresh-btn:disabled { opacity: 0.35; cursor: default; }
+
+  /* ── Loading / error states ──────────────────────────────────────────── */
+  .loading-state, .error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    gap: 16px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-icon { font-size: 32px; }
+
+  /* ── Section label ───────────────────────────────────────────────────── */
+  .section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  /* ── Stat cards ──────────────────────────────────────────────────────── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+    gap: 14px;
+    margin-bottom: 36px;
+  }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px 20px 18px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .stat:hover { border-color: var(--border2); transform: translateY(-1px); }
+
+  .stat-accent-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .stat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .stat-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-sub { font-size: 12px; color: var(--muted); font-weight: 400; }
+
+  /* ── Filter pills ────────────────────────────────────────────────────── */
+  .filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .filter-label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); margin-right: 4px; }
+  .fp {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .fp:hover { border-color: var(--border2); color: var(--text); }
+  .fp.active { border-color: var(--accent); color: var(--accent); background: rgba(232,245,78,0.08); }
+
+  /* ── Chart ───────────────────────────────────────────────────────────── */
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px 24px 16px;
+    margin-bottom: 14px;
+  }
+
+  .chart-hd {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .chart-title { font-size: 15px; font-weight: 600; }
+  .chart-title small {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 400;
+    margin-left: 8px;
+  }
+
+  .legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .li {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .ld { width: 8px; height: 8px; border-radius: 2px; }
+
+  .chart-scroll { overflow-x: auto; }
+  .chart-inner { position: relative; }
+  .chart-y {
+    position: absolute;
+    left: 0; top: 0; bottom: 28px;
+    width: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-right: 8px;
+  }
+  .y-tick { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); }
+
+  .chart-plot {
+    padding-left: 44px;
+    position: relative;
+  }
+
+  .grid-lines {
+    position: absolute;
+    left: 44px; right: 0; top: 0;
+    pointer-events: none;
+  }
+  .grid-line {
+    position: absolute;
+    left: 0; right: 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .bars-wrap {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 200px;
+    min-width: 700px;
+    position: relative;
+  }
+  .bar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    min-width: 6px;
+    cursor: crosshair;
+    height: 100%;
+  }
+  .bar-spacer { flex: 1; }
+  .bar-rect {
+    width: 100%;
+    border-radius: 2px 2px 0 0;
+    transition: filter 0.15s;
+  }
+  .bar-col:hover .bar-rect { filter: brightness(1.3); }
+  .bar-x-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 8px;
+    color: var(--muted);
+    margin-top: 5px;
+    transform: rotate(-50deg);
+    transform-origin: center top;
+    white-space: nowrap;
+    height: 20px;
+  }
+
+  /* threshold line */
+  .thr-line {
+    position: absolute;
+    left: 0; right: 0;
+    border-top: 1px dashed rgba(232,245,78,0.35);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .thr-label {
+    position: absolute;
+    right: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--accent);
+    transform: translateY(-100%);
+    background: var(--surface);
+    padding: 0 4px;
+  }
+
+  /* ── Monthly cards ───────────────────────────────────────────────────── */
+  .monthly-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    margin-bottom: 36px;
+  }
+
+  .mc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    transition: border-color 0.2s;
+  }
+  .mc:hover { border-color: var(--border2); }
+
+  .mc-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .mc-name { font-size: 14px; font-weight: 600; }
+  .mc-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--surface2);
+    border-radius: 4px;
+    padding: 3px 8px;
+  }
+
+  .mc-bar-track {
+    height: 5px;
+    background: var(--surface2);
+    border-radius: 3px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .mc-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+  }
+
+  .mc-stats {
+    display: flex;
+    justify-content: space-between;
+  }
+  .mc-stat { text-align: center; }
+  .mc-stat-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .mc-stat-lbl { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+  /* ── Table ───────────────────────────────────────────────────────────── */
+  .table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .table-head {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .table-title { font-size: 14px; font-weight: 600; }
+  .table-title small {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 400;
+    margin-left: 6px;
+  }
+  .search {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 14px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    width: 220px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search::placeholder { color: var(--muted); }
+  .search:focus { border-color: var(--accent); }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--surface2); }
+  th {
+    padding: 11px 16px;
+    text-align: left;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  th:hover { color: var(--accent); }
+  th.sorted { color: var(--accent); }
+
+  td {
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(28,32,48,0.7);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(232,245,78,0.025); }
+
+  .mono { font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+
+  .kwh-chip {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 5px;
+  }
+  .type-chip {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .mini-bar-wrap { display: flex; align-items: center; gap: 7px; }
+  .mini-bar { height: 5px; border-radius: 3px; }
+
+  .over-threshold { font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+
+  .pager {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 22px;
+    border-top: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .pager-btns { display: flex; gap: 8px; }
+  .pb {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 6px 14px;
+    color: var(--text);
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    transition: all 0.15s;
+  }
+  .pb:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .pb:disabled { opacity: 0.3; cursor: default; }
+
+  /* ── Tooltip ─────────────────────────────────────────────────────────── */
+  #tooltip {
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 9999;
+    display: none;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(232,245,78,0.1);
+    min-width: 160px;
+  }
+  .tt-date { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--accent); margin-bottom: 6px; letter-spacing: 1px; }
+  .tt-val { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; line-height: 1; margin-bottom: 4px; }
+  .tt-sub { font-size: 11px; color: var(--muted); }
+
+  /* ── Footer ──────────────────────────────────────────────────────────── */
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .footer-left { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+  .footer-left span { color: var(--accent); }
+  .footer-right { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+
+  /* ── Animations ──────────────────────────────────────────────────────── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .fade-up {
+    opacity: 0;
+    animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .d1 { animation-delay: 0.05s; }
+  .d2 { animation-delay: 0.10s; }
+  .d3 { animation-delay: 0.15s; }
+  .d4 { animation-delay: 0.20s; }
+  .d5 { animation-delay: 0.25s; }
+
+  @media (max-width: 600px) {
+    .page { padding: 0 14px 40px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .topbar { flex-wrap: wrap; gap: 12px; }
+    .search { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Top bar -->
+  <nav class="topbar">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <div class="logo-text">
+        <div class="logo-name">Inwood <span>Electricity</span></div>
+        <div class="logo-sub">PSE&amp;G · Meter #000303411361</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="status-pill">
+        <div class="status-dot loading" id="statusDot"></div>
+        <span id="statusText">Loading…</span>
+      </div>
+      <button class="refresh-btn" id="refreshBtn" onclick="loadData(true)" disabled>⟳ Refresh</button>
+    </div>
+  </nav>
+
+  <!-- Dynamic content -->
+  <div id="loadingState" class="loading-state">
+    <div class="spinner"></div>
+    <span>Fetching meter data from Gmail…</span>
+  </div>
+
+  <div id="errorState" class="error-state" style="display:none;">
+    <div class="error-icon">⚠️</div>
+    <span id="errorMsg">Failed to load data.</span>
+    <button class="refresh-btn" onclick="loadData(true)" style="margin-top:8px;">Retry</button>
+  </div>
+
+  <div id="mainContent" style="display:none;">
+
+    <!-- Stats -->
+    <div class="section-label">Overview</div>
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <!-- Filter pills -->
+    <div class="filters">
+      <span class="filter-label">SHOW:</span>
+      <button class="fp active" onclick="setFilter('all',this)">All</button>
+      <button class="fp" onclick="setFilter('daily',this)">Daily</button>
+      <button class="fp" onclick="setFilter('monthly',this)">Monthly</button>
+      <button class="fp" onclick="setFilter('hourly',this)">Hourly</button>
+    </div>
+
+    <!-- Bar chart -->
+    <div class="section-label">Daily Usage Trend</div>
+    <div class="chart-card fade-up d2">
+      <div class="chart-hd">
+        <div>
+          <div class="chart-title">Consumption Alerts <small>days exceeding 15 kWh threshold</small></div>
+        </div>
+        <div class="legend">
+          <div class="li"><div class="ld" style="background:var(--c-ok)"></div>15–20</div>
+          <div class="li"><div class="ld" style="background:var(--c-mid)"></div>20–35</div>
+          <div class="li"><div class="ld" style="background:var(--c-high)"></div>35–50</div>
+          <div class="li"><div class="ld" style="background:var(--c-crit)"></div>50+</div>
+        </div>
+      </div>
+      <div class="chart-scroll">
+        <div class="chart-inner">
+          <div class="chart-y" id="chartY"></div>
+          <div class="chart-plot" id="chartPlot">
+            <div class="grid-lines" id="gridLines"></div>
+            <div class="bars-wrap" id="barsWrap"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Monthly breakdown -->
+    <div class="section-label" style="margin-top:28px;">Monthly Summary</div>
+    <div class="monthly-grid" id="monthlyGrid"></div>
+
+    <!-- Table -->
+    <div class="section-label">Alert Log</div>
+    <div class="table-card fade-up d4">
+      <div class="table-head">
+        <div class="table-title">All Records <small id="tableCount"></small></div>
+        <input class="search" id="searchBox" placeholder="Search date, kWh, type…" oninput="onSearch()">
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th onclick="doSort('date')" id="th-date">Date <span id="sa-date">↕</span></th>
+            <th onclick="doSort('kwh')"  id="th-kwh">kWh <span id="sa-kwh">↕</span></th>
+            <th>Bar</th>
+            <th onclick="doSort('type')" id="th-type">Type <span id="sa-type">↕</span></th>
+            <th onclick="doSort('month')" id="th-month">Month <span id="sa-month">↕</span></th>
+            <th>+/− Threshold</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="pager">
+        <span id="pageInfo"></span>
+        <div class="pager-btns">
+          <button class="pb" id="prevBtn" onclick="goPage(-1)">← Prev</button>
+          <button class="pb" id="nextBtn" onclick="goPage(1)">Next →</button>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="footer-left">
+        <span>Inwood Electricity</span> · Account ****1908 · Little Falls, NJ<br>
+        Data cached for 6 hours · <span id="footerFetch"></span>
+      </div>
+      <div class="footer-right">Powered by Cloudflare Pages + Gmail API</div>
+    </footer>
+
+  </div><!-- /mainContent -->
+</div><!-- /page -->
+
+<!-- Tooltip -->
+<div id="tooltip">
+  <div class="tt-date" id="ttDate"></div>
+  <div class="tt-val" id="ttVal"></div>
+  <div class="tt-sub" id="ttSub"></div>
+</div>
+
+<script>
+// ── Color helpers ──────────────────────────────────────────────────────────────
+const COLORS = {
+  ok:      '#4dffb4',
+  mid:     '#ffdd57',
+  high:    '#ff8c42',
+  crit:    '#ff4d4d',
+  monthly: '#4daaff',
+  hourly:  '#cc88ff',
+};
+
+function tierColor(kwh, type) {
+  if (type === 'monthly') return COLORS.monthly;
+  if (type === 'hourly')  return COLORS.hourly;
+  if (kwh >= 50) return COLORS.crit;
+  if (kwh >= 35) return COLORS.high;
+  if (kwh >= 20) return COLORS.mid;
+  return COLORS.ok;
+}
+
+function tierClass(kwh, type) {
+  if (type === 'monthly') return 'monthly';
+  if (type === 'hourly')  return 'hourly';
+  if (kwh >= 50) return 'crit';
+  if (kwh >= 35) return 'high';
+  if (kwh >= 20) return 'mid';
+  return 'ok';
+}
+
+function fmtDate(d) {
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric'
+  });
+}
+function fmtMonth(d) {
+  return new Date(d + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+}
+function fmtMonthFull(d) {
+  return new Date(d + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+// ── State ──────────────────────────────────────────────────────────────────────
+let allReadings = [];
+let filteredReadings = [];
+let currentFilter = 'all';
+let sortKey = 'date';
+let sortDir = 'desc';
+let page = 1;
+const PAGE_SIZE = 25;
+let searchVal = '';
+
+// ── Data loading ───────────────────────────────────────────────────────────────
+async function loadData(forceRefresh = false) {
+  setStatus('loading', 'Fetching…');
+  document.getElementById('refreshBtn').disabled = true;
+  document.getElementById('loadingState').style.display = 'flex';
+  document.getElementById('errorState').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'none';
+
+  try {
+    const url = forceRefresh ? '/api/meter-data?refresh=1' : '/api/meter-data';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    allReadings = data.readings || [];
+
+    const fetchedAt = data.fetchedAt
+      ? new Date(data.fetchedAt).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
+      : 'unknown';
+
+    setStatus('ok', `${data.source === 'cache' ? 'Cached' : 'Live'} · ${fetchedAt}`);
+    document.getElementById('footerFetch').textContent =
+      `Last fetched ${fetchedAt} · ${data.totalEmails} emails`;
+
+    render();
+
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    document.getElementById('refreshBtn').disabled = false;
+
+  } catch (err) {
+    setStatus('error', 'Error loading data');
+    document.getElementById('errorMsg').textContent = `Error: ${err.message}`;
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('errorState').style.display = 'flex';
+    document.getElementById('refreshBtn').disabled = false;
+    console.error(err);
+  }
+}
+
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot ' + (state === 'ok' ? '' : state);
+  document.getElementById('statusText').textContent = text;
+}
+
+// ── Render all ─────────────────────────────────────────────────────────────────
+function render() {
+  renderStats();
+  renderChart();
+  renderMonthly();
+  applyFilters();
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────────
+function renderStats() {
+  const daily   = allReadings.filter(r => r.type === 'daily');
+  const monthly = allReadings.filter(r => r.type === 'monthly');
+
+  const totalAlerts = allReadings.length;
+  const peakDay  = daily.length ? daily.reduce((a,b) => b.kwh > a.kwh ? b : a) : null;
+  const minDay   = daily.length ? daily.reduce((a,b) => b.kwh < a.kwh ? b : a) : null;
+  const avgDaily = daily.length ? daily.reduce((a,b) => a + b.kwh, 0) / daily.length : 0;
+  const peakMon  = monthly.length ? monthly.reduce((a,b) => b.kwh > a.kwh ? b : a) : null;
+
+  // hottest month by alert count
+  const mCounts = {};
+  daily.forEach(r => { const k = r.date.slice(0,7); mCounts[k] = (mCounts[k]||0)+1; });
+  const hotM = Object.entries(mCounts).reduce((a,b) => b[1]>a[1]?b:a, ['',0]);
+
+  const stats = [
+    { label: 'Total Alerts',      val: totalAlerts,                 sub: 'notifications', color: COLORS.ok },
+    { label: 'Peak Day',          val: peakDay  ? peakDay.kwh.toFixed(1)+' kWh' : '—', sub: peakDay ? fmtDate(peakDay.date) : '', color: COLORS.crit },
+    { label: 'Avg (Daily Alerts)',val: avgDaily.toFixed(1)+' kWh',  sub: 'per flagged day', color: COLORS.mid },
+    { label: 'Lowest Day',        val: minDay   ? minDay.kwh.toFixed(1)+' kWh' : '—', sub: minDay ? fmtDate(minDay.date) : '', color: COLORS.ok },
+    { label: 'Monthly Record',    val: peakMon  ? peakMon.kwh.toFixed(0)+' kWh' : '—', sub: peakMon ? fmtDate(peakMon.date) : '', color: COLORS.monthly },
+    { label: 'Busiest Month',     val: hotM[0]  ? fmtMonthFull(hotM[0]) : '—', sub: (hotM[1]||'') + ' daily alerts', color: COLORS.high },
+  ];
+
+  const grid = document.getElementById('statsGrid');
+  grid.innerHTML = stats.map((s, i) => `
+    <div class="stat fade-up d${Math.min(i+1,5)}">
+      <div class="stat-accent-bar" style="background:${s.color}"></div>
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-val" style="color:${s.color}">${s.val}</div>
+      <div class="stat-sub">${s.sub}</div>
+    </div>
+  `).join('');
+}
+
+// ── Bar chart ──────────────────────────────────────────────────────────────────
+function renderChart() {
+  const daily = allReadings
+    .filter(r => r.type === 'daily')
+    .slice()
+    .sort((a,b) => a.date.localeCompare(b.date));
+
+  if (!daily.length) return;
+
+  const maxKwh = Math.max(...daily.map(r => r.kwh));
+  const chartH  = 200;
+  const padB    = 28;
+  const usableH = chartH - padB;
+
+  // Y axis
+  const yEl = document.getElementById('chartY');
+  yEl.style.height = chartH + 'px';
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(f * maxKwh)).reverse();
+  yEl.innerHTML = ticks.map(t => `<div class="y-tick">${t}</div>`).join('');
+
+  // Grid lines
+  const glEl = document.getElementById('gridLines');
+  glEl.style.height = usableH + 'px';
+  glEl.innerHTML = ticks.slice(0,-1).map(t => {
+    const pct = ((maxKwh - t) / maxKwh) * 100;
+    return `<div class="grid-line" style="top:${pct}%"></div>`;
+  }).join('');
+
+  // Threshold line (15 kWh)
+  const thrPct = (1 - (15 / maxKwh)) * 100;
+  const plotEl = document.getElementById('chartPlot');
+  // Remove old threshold line if any
+  const oldThr = plotEl.querySelector('.thr-line');
+  if (oldThr) oldThr.remove();
+  const thrEl = document.createElement('div');
+  thrEl.className = 'thr-line';
+  thrEl.style.top = (thrPct / 100 * usableH) + 'px';
+  thrEl.innerHTML = `<span class="thr-label">15 kWh</span>`;
+  plotEl.appendChild(thrEl);
+
+  // Bars
+  const wrap = document.getElementById('barsWrap');
+  wrap.innerHTML = '';
+  wrap.style.height = chartH + 'px';
+
+  const tt = document.getElementById('tooltip');
+  const ttDate = document.getElementById('ttDate');
+  const ttVal  = document.getElementById('ttVal');
+  const ttSub  = document.getElementById('ttSub');
+
+  daily.forEach(r => {
+    const barH = Math.max(2, (r.kwh / maxKwh) * usableH);
+    const color = tierColor(r.kwh, r.type);
+    const over  = (r.kwh - 15).toFixed(2);
+
+    const col = document.createElement('div');
+    col.className = 'bar-col';
+
+    col.innerHTML = `
+      <div class="bar-spacer"></div>
+      <div class="bar-rect" style="height:${barH}px; background:${color}; box-shadow: 0 0 8px ${color}55;"></div>
+      <div class="bar-x-label">${r.date.slice(5)}</div>
+    `;
+
+    col.addEventListener('mouseenter', e => {
+      tt.style.display = 'block';
+      ttDate.textContent = fmtDate(r.date);
+      ttVal.textContent  = r.kwh.toFixed(2) + ' kWh';
+      ttVal.style.color  = color;
+      ttSub.textContent  = `+${over} kWh above threshold`;
+    });
+    col.addEventListener('mousemove', e => {
+      tt.style.left = (e.clientX + 16) + 'px';
+      tt.style.top  = (e.clientY - 50) + 'px';
+    });
+    col.addEventListener('mouseleave', () => { tt.style.display = 'none'; });
+
+    wrap.appendChild(col);
+  });
+}
+
+// ── Monthly summary ────────────────────────────────────────────────────────────
+function renderMonthly() {
+  const daily = allReadings.filter(r => r.type === 'daily');
+  const byMonth = {};
+  daily.forEach(r => {
+    const k = r.date.slice(0,7);
+    if (!byMonth[k]) byMonth[k] = [];
+    byMonth[k].push(r.kwh);
+  });
+
+  const avgs = Object.values(byMonth).map(v => v.reduce((a,b)=>a+b,0)/v.length);
+  const globalMax = Math.max(...avgs);
+
+  const grid = document.getElementById('monthlyGrid');
+  grid.innerHTML = Object.entries(byMonth)
+    .sort((a,b) => b[0].localeCompare(a[0]))
+    .map(([key, vals]) => {
+      const avg  = vals.reduce((a,b)=>a+b,0)/vals.length;
+      const max  = Math.max(...vals);
+      const min  = Math.min(...vals);
+      const pct  = (avg / globalMax) * 100;
+      const col  = tierColor(avg, 'daily');
+      return `
+        <div class="mc fade-up">
+          <div class="mc-head">
+            <div class="mc-name">${fmtMonthFull(key)}</div>
+            <div class="mc-count">${vals.length} alerts</div>
+          </div>
+          <div class="mc-bar-track">
+            <div class="mc-bar-fill" style="width:${pct}%;background:${col};"></div>
+          </div>
+          <div class="mc-stats">
+            <div class="mc-stat">
+              <div class="mc-stat-val" style="color:${col}">${avg.toFixed(1)}</div>
+              <div class="mc-stat-lbl">avg kWh</div>
+            </div>
+            <div class="mc-stat">
+              <div class="mc-stat-val" style="color:${COLORS.crit}">${max.toFixed(1)}</div>
+              <div class="mc-stat-lbl">peak</div>
+            </div>
+            <div class="mc-stat">
+              <div class="mc-stat-val" style="color:${COLORS.ok}">${min.toFixed(1)}</div>
+              <div class="mc-stat-lbl">low</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+}
+
+// ── Table / filter / sort ──────────────────────────────────────────────────────
+function setFilter(f, btn) {
+  currentFilter = f;
+  page = 1;
+  document.querySelectorAll('.fp').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+function onSearch() {
+  searchVal = document.getElementById('searchBox').value.toLowerCase();
+  page = 1;
+  applyFilters();
+}
+
+function doSort(key) {
+  sortDir = sortKey === key ? (sortDir === 'asc' ? 'desc' : 'asc') : 'desc';
+  sortKey = key;
+  ['date','kwh','type','month'].forEach(k => {
+    document.getElementById('th-'+k).classList.remove('sorted');
+    document.getElementById('sa-'+k).textContent = '↕';
+  });
+  document.getElementById('th-'+key).classList.add('sorted');
+  document.getElementById('sa-'+key).textContent = sortDir === 'asc' ? '↑' : '↓';
+  applyFilters();
+}
+
+function goPage(dir) {
+  const max = Math.ceil(filteredReadings.length / PAGE_SIZE);
+  page = Math.max(1, Math.min(max, page + dir));
+  renderTable();
+}
+
+function applyFilters() {
+  let data = allReadings.filter(r => {
+    if (currentFilter !== 'all' && r.type !== currentFilter) return false;
+    if (searchVal) {
+      const s = searchVal;
+      return r.date.includes(s)
+          || r.kwh.toString().includes(s)
+          || r.type.includes(s)
+          || fmtDate(r.date).toLowerCase().includes(s);
+    }
+    return true;
+  });
+
+  data.sort((a,b) => {
+    let va, vb;
+    if (sortKey === 'date')  { va = a.date; vb = b.date; }
+    else if (sortKey === 'kwh')   { va = a.kwh;  vb = b.kwh;  }
+    else if (sortKey === 'type')  { va = a.type; vb = b.type; }
+    else if (sortKey === 'month') { va = a.date.slice(0,7); vb = b.date.slice(0,7); }
+    else { va = a.date; vb = b.date; }
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ?  1 : -1;
+    return 0;
+  });
+
+  filteredReadings = data;
+  renderTable();
+}
+
+function renderTable() {
+  const daily = allReadings.filter(r => r.type === 'daily');
+  const maxKwh = daily.length ? Math.max(...daily.map(r => r.kwh)) : 60;
+  const start  = (page - 1) * PAGE_SIZE;
+  const slice  = filteredReadings.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('tableCount').textContent = `${filteredReadings.length} records`;
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = slice.map(r => {
+    const color   = tierColor(r.kwh, r.type);
+    const barW    = r.type === 'daily' ? Math.round((r.kwh / maxKwh) * 80) : 12;
+    const over    = r.type === 'daily' ? (r.kwh - 15) : null;
+    const overStr = over !== null
+      ? `<span class="over-threshold" style="color:${color}">${over > 0 ? '+' : ''}${over.toFixed(2)} kWh</span>`
+      : `<span style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:12px">—</span>`;
+
+    return `
+      <tr>
+        <td><span class="mono">${fmtDate(r.date)}</span></td>
+        <td>
+          <span class="kwh-chip" style="background:${color}18; color:${color}">
+            ${r.kwh.toFixed(2)}
+          </span>
+        </td>
+        <td>
+          <div class="mini-bar-wrap">
+            <div class="mini-bar" style="width:${barW}px; background:${color};"></div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)">${barW}%</span>
+          </div>
+        </td>
+        <td>
+          <span class="type-chip" style="background:${color}18; color:${color}; letter-spacing:1px">
+            ${r.type}
+          </span>
+        </td>
+        <td><span class="mono" style="color:var(--muted)">${fmtMonth(r.date)}</span></td>
+        <td>${overStr}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const maxPage = Math.ceil(filteredReadings.length / PAGE_SIZE);
+  document.getElementById('pageInfo').textContent =
+    `Page ${page} of ${maxPage || 1}  (${filteredReadings.length} records)`;
+  document.getElementById('prevBtn').disabled = page <= 1;
+  document.getElementById('nextBtn').disabled = page >= maxPage;
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>

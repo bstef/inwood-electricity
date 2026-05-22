@@ -1,0 +1,6 @@
+node_modules/
+.wrangler/
+.env.secrets
+*.local
+.DS_Store
+dist/
