@@ -25,6 +25,25 @@ PSE&G email → Gmail inbox
        • Shows live/cached status in top bar
 ```
 
+### Gmail API — how fetching works
+
+The function uses **`threads.list`** (not `messages.list`) to retrieve emails. This is an important distinction:
+
+- `messages.list` returns only message IDs — getting snippets would require a second API call per message, which quickly exceeds Cloudflare Workers' subrequest limit (50/request on the free plan) and Gmail's batch API limit (100 requests per batch).
+- `threads.list` returns the **snippet of the first message in each thread inline**, so all data arrives in a single paginated response with no secondary fetches needed.
+
+For PSE&G threshold notifications (one email per thread), this is equivalent and far more efficient: ~2000 emails fetch in 1–4 subrequests instead of hundreds.
+
+**Search query:** `from:MyMeter@email.pseg.com`  
+Scoped to the sender only (not subject line) to catch all notification types — daily, hourly, and monthly totals.
+
+**Pagination:** up to 4 pages × 500 threads = 2000 emails max per refresh.
+
+**Debug endpoint:** add `?debug=1` to the API URL to see the raw Gmail response, active query, and access token prefix without hitting the cache:
+```
+https://inwood-electricity.pages.dev/api/meter-data?debug=1
+```
+
 ---
 
 ## Prerequisites
@@ -228,3 +247,6 @@ inwood-electricity/
 | `KV_METER_DATA is not defined` | KV namespace ID not set in `wrangler.toml` or not deployed |
 | No data showing | Check browser console — `/api/meter-data` should return JSON |
 | Function not running | Make sure `functions/api/meter-data.js` path is correct — Cloudflare Pages maps file paths to routes |
+| `totalEmails: 0` | Hit `?debug=1` to inspect the raw Gmail response. Common causes: wrong sender address in query, OAuth scope too narrow (`gmail.readonly` required), or refresh token revoked |
+| Stale data after fixing | Add `?refresh=1` to bust the KV cache and force a fresh Gmail fetch |
+| Missing emails | The function caps at 4 pages × 500 = 2000 threads. If you have more, increase the `pages < 4` limit in `fetchMessageList` |
