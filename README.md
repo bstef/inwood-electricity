@@ -1,60 +1,97 @@
 # ⚡ Inwood Electricity
 
-PSE&G MyMeter threshold notification dashboard — deployed on **Cloudflare Pages** with a **Cloudflare Pages Function** that auto-fetches your Gmail data on every visit (cached 6 hours in KV).
+PSE&G MyMeter threshold notification dashboard — live at **[inwood-electricity.pages.dev](https://inwood-electricity.pages.dev)**.
 
-```
-https://inwood-electricity.pages.dev   (or your custom domain)
-```
+Built on **Cloudflare Pages** with a **Pages Function** that auto-fetches PSE&G Gmail notifications and caches results in **Cloudflare KV**. No server, no cron job — data refreshes automatically on every visit after the 6-hour cache window.
 
 ---
 
 ## Architecture
 
 ```
-PSE&G email → Gmail inbox
-                  ↓
-     Cloudflare Pages Function (/api/meter-data)
-       • OAuth2 refresh token → Gmail API
-       • Fetches all "MyMeter Threshold Notification" emails
-       • Parses date + kWh + type from each snippet
-       • Caches JSON in Cloudflare KV for 6 hours
-                  ↓
-     public/index.html  (static, served by Cloudflare Pages)
-       • Fetches /api/meter-data on load
-       • Renders bar chart, monthly grid, sortable table
-       • Shows live/cached status in top bar
+PSE&G email → Gmail inbox (benjaminstef@gmail.com)
+                    ↓
+    Cloudflare Pages Function (/api/meter-data)
+      • OAuth2 refresh token → Gmail API
+      • messages.list with snippet — 1 subrequest per page
+      • Parses date + kWh + type from each snippet
+      • Caches parsed JSON in Cloudflare KV for 6 hours
+                    ↓
+    public/index.html  (static, served by Cloudflare Pages)
+      • Fetches /api/meter-data on load
+      • Shows live/cached status + last fetch time
+      • Bar chart, monthly summary grid, sortable table
+      • ?refresh=1 busts cache and re-fetches immediately
 ```
 
-### Gmail API — how fetching works
+---
 
-The function uses **`threads.list`** (not `messages.list`) to retrieve emails. This is an important distinction:
+## Key Technical Notes
 
-- `messages.list` returns only message IDs — getting snippets would require a second API call per message, which quickly exceeds Cloudflare Workers' subrequest limit (50/request on the free plan) and Gmail's batch API limit (100 requests per batch).
-- `threads.list` returns the **snippet of the first message in each thread inline**, so all data arrives in a single paginated response with no secondary fetches needed.
+### Why `messages.list` instead of batch API
 
-For PSE&G threshold notifications (one email per thread), this is equivalent and far more efficient: ~2000 emails fetch in 1–4 subrequests instead of hundreds.
+Early versions used Gmail's batch HTTP API to fetch snippets for all message IDs. This had two bugs:
 
-**Search query:** `from:MyMeter@email.pseg.com`  
-Scoped to the sender only (not subject line) to catch all notification types — daily, hourly, and monthly totals.
+1. Gmail batch API is limited to **100 requests per batch** — silently returns nothing when exceeded
+2. `messages.list` already returns `snippet` inline in the list response — no second call needed
 
-**Pagination:** up to 4 pages × 500 threads = 2000 emails max per refresh.
+The fix: `messages.list?maxResults=500` returns up to 500 messages with snippets per page. Each page = 1 subrequest. At ~200 PSE&G emails total, this is 1 subrequest — well within Cloudflare Workers' limit of 50 subrequests per invocation.
 
-**Debug endpoint:** add `?debug=1` to the API URL to see the raw Gmail response, active query, and access token prefix without hitting the cache:
+### Snippet parsing
+
+Each PSE&G email snippet looks like:
 ```
-https://inwood-electricity.pages.dev/api/meter-data?debug=1
+A MyMeter threshold setting for your account, ****1908, has been met.
+Meter #000303411361 has daily total consumption above 15 kWh.
+Actual use for this period was 21.81 kWh at 05-20-26 12:00 A.
+```
+
+Two regexes extract everything needed:
+- kWh: `/was\s+([\d.]+)\s+kWh/i`
+- Date: `/at\s+(\d{2}-\d{2}-\d{2})\s+\d{2}:\d{2}/i`
+- Type: detected from `hourly total`, `monthly total`, or `daily total` in snippet
+
+### Cache behavior
+
+| Request | Behavior |
+|---|---|
+| Normal page load | Returns KV cache if < 6 hours old |
+| Cache expired | Re-fetches Gmail, writes new cache |
+| `?refresh=1` | Bypasses cache, always re-fetches |
+| `?debug=1` | Returns raw Gmail API response for debugging |
+
+---
+
+## Repo Structure
+
+```
+inwood-electricity/
+├── public/
+│   └── index.html              # Dashboard UI (static HTML/CSS/JS)
+├── functions/
+│   └── api/
+│       └── meter-data.js       # Cloudflare Pages Function
+├── scripts/
+│   └── set-secrets.js          # Helper: push secrets to Cloudflare
+├── wrangler.toml               # Cloudflare config + KV namespace IDs
+├── package.json
+├── .gitignore                  # Excludes .env.secrets, node_modules
+└── README.md
 ```
 
 ---
 
 ## Prerequisites
 
-- **Node.js 18+** (for wrangler CLI)
-- **Cloudflare account** (free tier is sufficient)
-- **Google Cloud project** with Gmail API enabled
+- Node.js 18+
+- Cloudflare account (free tier)
+- Google Cloud project with Gmail API enabled
 
 ---
 
-## Step 1 — Clone & install
+## Setup
+
+### 1. Clone & install
 
 ```bash
 git clone https://github.com/bstef/inwood-electricity.git
@@ -62,49 +99,28 @@ cd inwood-electricity
 npm install
 ```
 
----
+### 2. Google OAuth2 credentials
 
-## Step 2 — Google OAuth2 credentials
+1. [Google Cloud Console](https://console.cloud.google.com) → create project **inwood-electricity**
+2. APIs & Services → Library → enable **Gmail API**
+3. APIs & Services → Credentials → Create OAuth client ID
+   - Type: **Web application**
+   - Authorized redirect URI: `https://developers.google.com/oauthplayground`
+4. Copy **Client ID** and **Client Secret**
 
-You need a **Client ID**, **Client Secret**, and a long-lived **Refresh Token** for your Gmail account (`benjaminstef@gmail.com`).
+**Get a refresh token:**
+1. Go to [OAuth Playground](https://developers.google.com/oauthplayground)
+2. ⚙️ gear → check **"Use your own OAuth credentials"** → enter Client ID + Secret
+3. Select scope: `https://www.googleapis.com/auth/gmail.readonly`
+4. Authorize → Exchange code for tokens → copy **Refresh token**
+5. Add yourself as a test user first:
+   - Google Cloud → APIs & Services → **Audience** → Test users → Add `benjaminstef@gmail.com`
 
-### 2a. Create a Google Cloud project
-
-1. Go to [https://console.cloud.google.com](https://console.cloud.google.com)
-2. Create a new project → **inwood-electricity**
-3. Enable **Gmail API**: APIs & Services → Library → search "Gmail API" → Enable
-
-### 2b. Create OAuth2 credentials
-
-1. APIs & Services → Credentials → **Create Credentials** → OAuth client ID
-2. Application type: **Web application**
-3. Name: `inwood-electricity`
-4. Authorized redirect URIs: add `https://developers.google.com/oauthplayground`
-5. Save — copy your **Client ID** and **Client Secret**
-
-### 2c. Get a Refresh Token
-
-1. Go to [https://developers.google.com/oauthplayground](https://developers.google.com/oauthplayground)
-2. Click the ⚙️ gear icon (top right) → check **"Use your own OAuth credentials"**
-3. Enter your Client ID and Client Secret → Close
-4. In Step 1, find and select:
-   `https://www.googleapis.com/auth/gmail.readonly`
-5. Click **Authorize APIs** → sign in as `benjaminstef@gmail.com`
-6. Click **Exchange authorization code for tokens**
-7. Copy the **Refresh token** value — this is long-lived and only shown once
-
----
-
-## Step 3 — Cloudflare KV namespace
+### 3. Cloudflare KV namespace
 
 ```bash
-# Create production namespace
-npx wrangler kv:namespace create "KV_METER_DATA"
-# → Returns: id = "abc123..."
-
-# Create preview namespace (for local dev)
-npx wrangler kv:namespace create "KV_METER_DATA" --preview
-# → Returns: preview_id = "def456..."
+npx wrangler kv namespace create KV_METER_DATA
+npx wrangler kv namespace create KV_METER_DATA --preview
 ```
 
 Paste both IDs into `wrangler.toml`:
@@ -112,130 +128,63 @@ Paste both IDs into `wrangler.toml`:
 ```toml
 [[kv_namespaces]]
 binding    = "KV_METER_DATA"
-id         = "abc123..."          # ← production id
-preview_id = "def456..."          # ← preview id
+id         = "your-production-id"
+preview_id = "your-preview-id"
 ```
 
----
+### 4. Set secrets
 
-## Step 4 — Set secrets
-
-Create a `.env.secrets` file (never committed — it's in `.gitignore`):
-
-```bash
+Create `.env.secrets` (gitignored):
+```
 GMAIL_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GMAIL_CLIENT_SECRET=GOCSPX-your-secret
 GMAIL_REFRESH_TOKEN=1//your-refresh-token
 ```
 
-Push secrets to Cloudflare:
-
+Push to Cloudflare:
 ```bash
 node scripts/set-secrets.js
 ```
 
-Or set them manually:
+Or set manually in Cloudflare dashboard:
+**Pages** → your project → **Settings** → **Environment Variables** → add all three as encrypted variables under **Production**.
 
-```bash
-npx wrangler pages secret put GMAIL_CLIENT_ID       --project-name inwood-electricity
-npx wrangler pages secret put GMAIL_CLIENT_SECRET   --project-name inwood-electricity
-npx wrangler pages secret put GMAIL_REFRESH_TOKEN   --project-name inwood-electricity
-```
+### 5. Deploy via GitHub
+
+1. Push repo to `github.com/bstef/inwood-electricity`
+2. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** → **Get started**
+3. Connect to Git → select repo
+4. Build settings:
+   - Build command: *(blank)*
+   - Build output directory: `public`
+   - Deploy command: `echo "deploy"`
+5. Save and Deploy
+
+Every `git push` to `main` triggers an automatic redeployment.
+
+### 6. Add KV binding in dashboard
+
+After first deploy:
+- **Settings** → **Bindings** → **Add** → **KV Namespace**
+- Variable name: `KV_METER_DATA`
+- Select your namespace
+- Save → redeploy
 
 ---
 
-## Step 5 — Local development
+## Local Development
 
 ```bash
-npm run dev
-# → http://localhost:8788
-```
-
-The Pages Function runs locally via Miniflare. It will call Gmail API using your secrets (set via wrangler dev env or `.env.secrets`).
-
-For local dev with secrets, create a `.dev.vars` file (also gitignored):
-
-```
+# Create .dev.vars with your secrets (gitignored)
+cat > .dev.vars << EOF
 GMAIL_CLIENT_ID=your-client-id
 GMAIL_CLIENT_SECRET=your-secret
 GMAIL_REFRESH_TOKEN=your-refresh-token
+EOF
+
+npm run dev
+# → http://localhost:8788
 ```
-
----
-
-## Step 6 — Deploy to Cloudflare Pages
-
-### Option A — GitHub (recommended, auto-deploy on push)
-
-1. Push repo to GitHub: `https://github.com/bstef/inwood-electricity`
-2. Cloudflare dashboard → **Pages** → **Create a project** → Connect to Git
-3. Select the repo
-4. Build settings:
-   - **Framework preset**: None
-   - **Build command**: _(leave blank)_
-   - **Build output directory**: `public`
-5. Click **Save and Deploy**
-
-Every `git push` to `main` triggers a new deployment automatically.
-
-### Option B — Direct upload (wrangler CLI)
-
-```bash
-npm run deploy
-```
-
----
-
-## Step 7 — Custom domain (optional)
-
-In Cloudflare Pages dashboard → your project → **Custom domains** → Add domain.
-
-Since your DNS is already in Cloudflare, it's a one-click setup. Suggested subdomain:
-
-```
-electricity.yourdomain.com
-```
-
----
-
-## Repo structure
-
-```
-inwood-electricity/
-├── public/
-│   └── index.html              # Dashboard UI (static)
-├── functions/
-│   └── api/
-│       └── meter-data.js       # Cloudflare Pages Function (Gmail API + KV cache)
-├── scripts/
-│   └── set-secrets.js          # Helper: push secrets to Cloudflare
-├── wrangler.toml               # Cloudflare config
-├── package.json
-├── .gitignore
-└── README.md
-```
-
----
-
-## How data refresh works
-
-| Trigger | What happens |
-|---|---|
-| Dashboard loaded | Checks KV cache → if < 6 hrs old, returns cached JSON |
-| Cache expired / first visit | Calls Gmail API, parses all PSE&G emails, writes to KV |
-| ⟳ Refresh button | Forces fresh Gmail fetch regardless of cache age |
-
----
-
-## Extending / modifying
-
-**Change cache TTL** — edit `CACHE_TTL_SECONDS` in `functions/api/meter-data.js`
-
-**Add more alert types** — the parser in `parseReadings()` already handles daily / hourly / monthly; extend the regex for new formats
-
-**Add Home Assistant sensor** — have HA call `/api/meter-data` and parse the JSON into a template sensor
-
-**Add Slack/email alert** — add a Cloudflare Cron Trigger that calls the worker on a schedule and pings you if usage exceeds a threshold
 
 ---
 
@@ -243,10 +192,21 @@ inwood-electricity/
 
 | Problem | Fix |
 |---|---|
-| `OAuth token error` | Refresh token expired or revoked — re-run OAuth playground step |
-| `KV_METER_DATA is not defined` | KV namespace ID not set in `wrangler.toml` or not deployed |
-| No data showing | Check browser console — `/api/meter-data` should return JSON |
-| Function not running | Make sure `functions/api/meter-data.js` path is correct — Cloudflare Pages maps file paths to routes |
-| `totalEmails: 0` | Hit `?debug=1` to inspect the raw Gmail response. Common causes: wrong sender address in query, OAuth scope too narrow (`gmail.readonly` required), or refresh token revoked |
-| Stale data after fixing | Add `?refresh=1` to bust the KV cache and force a fresh Gmail fetch |
-| Missing emails | The function caps at 4 pages × 500 = 2000 threads. If you have more, increase the `pages < 4` limit in `fetchMessageList` |
+| `totalEmails: 0` | Delete `meter_data_v1` key from KV namespace in dashboard, then hit `?refresh=1` |
+| `OAuth error` | Refresh token expired — re-run OAuth Playground flow |
+| `KV_METER_DATA not defined` | KV binding not set in dashboard or `wrangler.toml` IDs missing |
+| Dashboard shows "Failed to load" | Check `/api/meter-data` directly in browser for error JSON |
+| Cloudflare build fails | Make sure deploy command is `echo "deploy"` and build output is `public` |
+| "Too many subrequests" | Old version of `meter-data.js` — update to current version using `messages.list` |
+
+---
+
+## Extending
+
+**Change cache TTL** — edit `CACHE_TTL_SECONDS` in `functions/api/meter-data.js`
+
+**Add a custom domain** — Cloudflare Pages → Custom domains → point `electricity.yourdomain.com`
+
+**Home Assistant sensor** — call `/api/meter-data` from a HA REST sensor to pull latest readings into your dashboard
+
+**Slack/email alerts** — add a Cloudflare Cron Trigger that checks latest reading and pings you if over a threshold
