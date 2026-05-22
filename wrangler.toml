@@ -1,29 +1,11 @@
 name = "inwood-electricity"
 pages_build_output_dir = "public"
-
-# ── KV Namespace binding ───────────────────────────────────────────────────────
-# 1. Create the namespace:   npx wrangler kv:namespace create "KV_METER_DATA"
-# 2. Paste the returned id below.
-# 3. For preview/dev:        npx wrangler kv:namespace create "KV_METER_DATA" --preview
-#    Paste the preview_id below.
-
-[[kv_namespaces]]
-binding     = "KV_METER_DATA"
-id          = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
-preview_id  = "REPLACE_WITH_YOUR_KV_PREVIEW_ID"
-
-# ── Compatibility ──────────────────────────────────────────────────────────────
 compatibility_date = "2024-09-23"
 
-# ── Environment variables ──────────────────────────────────────────────────────
-# DO NOT put secret values here. Set secrets via:
-#   npx wrangler pages secret put GMAIL_CLIENT_ID
-#   npx wrangler pages secret put GMAIL_CLIENT_SECRET
-#   npx wrangler pages secret put GMAIL_REFRESH_TOKEN
-#
-# Or set them in the Cloudflare dashboard:
-#   Pages → inwood-electricity → Settings → Environment Variables
-#
-# Non-secret vars can go here:
+[[kv_namespaces]]
+binding    = "KV_METER_DATA"
+id         = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_YOUR_KV_PREVIEW_ID"
+
 [vars]
 CACHE_TTL_HOURS = "6"
