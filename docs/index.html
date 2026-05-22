@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inwood Electricity — Project Showcase</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Reset + Root ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+:root {
+  --ink:     #0c0d10;
+  --paper:   #f5f2eb;
+  --paper2:  #ede9e0;
+  --paper3:  #e4dfd4;
+  --lime:    #d4f53c;
+  --lime2:   #b8de1a;
+  --red:     #e8392a;
+  --amber:   #f5a623;
+  --blue:    #1a4fff;
+  --muted:   #6b6860;
+  --border:  #d6d1c7;
+
+  --f-display: 'Clash Display', sans-serif;
+  --f-serif:   'Instrument Serif', serif;
+  --f-mono:    'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--f-display);
+  background: var(--paper);
+  color: var(--ink);
+  overflow-x: hidden;
+  cursor: none;
+}
+
+/* ── Custom cursor ────────────────────────────────────────────────────── */
+.cursor {
+  position: fixed;
+  width: 10px; height: 10px;
+  background: var(--lime);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%,-50%);
+  transition: transform 0.1s, width 0.2s, height 0.2s, background 0.2s;
+  mix-blend-mode: multiply;
+}
+.cursor.hover {
+  width: 40px; height: 40px;
+  background: var(--lime);
+}
+
+/* ── Noise texture overlay ────────────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+}
+
+/* ── Navigation ───────────────────────────────────────────────────────── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 48px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s, background 0.3s;
+}
+nav.scrolled {
+  background: rgba(245,242,235,0.92);
+  backdrop-filter: blur(12px);
+  border-color: var(--border);
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.nav-logo-icon {
+  width: 28px; height: 28px;
+  background: var(--ink);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.nav-links {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+  list-style: none;
+}
+.nav-links a {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-decoration: none;
+  color: var(--muted);
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--ink); }
+
+.nav-cta {
+  background: var(--ink) !important;
+  color: var(--lime) !important;
+  padding: 8px 18px;
+  border-radius: 4px;
+  font-weight: 500 !important;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 48px 80px;
+  overflow: hidden;
+}
+
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Diagonal grid */
+.hero-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(12,13,16,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(12,13,16,0.06) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* Big decorative number */
+.hero-bg-number {
+  position: absolute;
+  top: 50%;
+  right: -60px;
+  transform: translateY(-55%);
+  font-family: var(--f-display);
+  font-size: clamp(200px, 30vw, 420px);
+  font-weight: 700;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(12,13,16,0.08);
+  line-height: 1;
+  user-select: none;
+  pointer-events: none;
+  letter-spacing: -20px;
+}
+
+/* Floating meter cards */
+.hero-card {
+  position: absolute;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  box-shadow: 0 24px 80px rgba(12,13,16,0.2);
+  animation: float 6s ease-in-out infinite;
+}
+.hero-card:nth-child(2) { animation-delay: -2s; }
+.hero-card:nth-child(3) { animation-delay: -4s; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(var(--rot, 0deg)); }
+  50%       { transform: translateY(-12px) rotate(var(--rot, 0deg)); }
+}
+
+.card-1 { top: 18%; left: 5%; --rot: -3deg; }
+.card-2 { top: 28%; right: 8%; --rot: 2deg; }
+.card-3 { top: 55%; right: 14%; --rot: -1.5deg; }
+
+.hero-card .card-label {
+  color: rgba(245,242,235,0.45);
+  margin-bottom: 6px;
+  letter-spacing: 2px;
+  font-size: 9px;
+}
+.hero-card .card-val {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.hero-card .card-val span { color: var(--lime); }
+.hero-card .card-sub { color: rgba(245,242,235,0.5); margin-top: 4px; font-size: 10px; }
+.hero-card .card-bar {
+  height: 3px;
+  background: rgba(245,242,235,0.1);
+  border-radius: 2px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.hero-card .card-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--lime);
+}
+
+/* Lime accent tag */
+.hero-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--lime);
+  color: var(--ink);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 20px;
+  margin-bottom: 28px;
+  width: fit-content;
+}
+.hero-tag::before { content: '⚡'; }
+
+.hero-title {
+  font-size: clamp(52px, 8vw, 110px);
+  font-weight: 700;
+  letter-spacing: -4px;
+  line-height: 0.9;
+  margin-bottom: 32px;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-title .line2 {
+  font-family: var(--f-serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: -2px;
+}
+
+.hero-title .accent {
+  position: relative;
+  display: inline-block;
+}
+.hero-title .accent::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  left: 0; right: 0;
+  height: 8px;
+  background: var(--lime);
+  z-index: -1;
+  transform: skewX(-4deg);
+}
+
+.hero-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  position: relative;
+  z-index: 1;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.hero-desc {
+  max-width: 480px;
+  font-family: var(--f-serif);
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.hero-desc strong { color: var(--ink); font-weight: 400; font-style: italic; }
+
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--ink);
+  color: var(--lime);
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 1px;
+  font-weight: 500;
+  padding: 14px 28px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(12,13,16,0.2);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 14px 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+.btn-secondary:hover {
+  border-color: var(--ink);
+  background: var(--paper2);
+}
+
+.scroll-hint {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 60px;
+  animation: bounce 2s ease-in-out infinite;
+}
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+
+/* ── Section base ─────────────────────────────────────────────────────── */
+section {
+  position: relative;
+  z-index: 1;
+  padding: 100px 48px;
+}
+
+.section-tag {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-tag::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  background: var(--muted);
+}
+
+.section-title {
+  font-size: clamp(36px, 5vw, 64px);
+  font-weight: 700;
+  letter-spacing: -2px;
+  line-height: 1;
+  margin-bottom: 60px;
+}
+.section-title em {
+  font-family: var(--f-serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* ── Stats bar ────────────────────────────────────────────────────────── */
+.stats-bar {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 40px 48px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 32px;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.stats-bar::before {
+  content: 'DATA';
+  position: absolute;
+  right: 48px;
+  font-size: 120px;
+  font-weight: 700;
+  color: rgba(245,242,235,0.04);
+  letter-spacing: -6px;
+  pointer-events: none;
+}
+
+.stat-item { text-align: center; }
+.stat-num {
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -2px;
+  line-height: 1;
+  color: var(--lime);
+  display: block;
+}
+.stat-lbl {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: rgba(245,242,235,0.45);
+  margin-top: 6px;
+  display: block;
+  text-transform: uppercase;
+}
+
+.stats-divider {
+  width: 1px;
+  height: 60px;
+  background: rgba(245,242,235,0.1);
+}
+
+/* ── Architecture section ─────────────────────────────────────────────── */
+.arch-section { background: var(--paper); }
+
+.arch-flow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  margin-bottom: 60px;
+}
+
+.arch-node {
+  flex: 1;
+  min-width: 160px;
+  background: var(--paper2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px 20px;
+  text-align: center;
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.arch-node:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(12,13,16,0.1);
+}
+
+.arch-node.highlight {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.arch-node.highlight .arch-node-label { color: rgba(245,242,235,0.5); }
+.arch-node.highlight .arch-node-name { color: var(--lime); }
+
+.arch-node-icon { font-size: 28px; margin-bottom: 12px; }
+.arch-node-label {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.arch-node-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+.arch-node-sub {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.arch-node.highlight .arch-node-sub { color: rgba(245,242,235,0.4); }
+
+.arch-arrow {
+  font-size: 20px;
+  color: var(--muted);
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+
+/* ── Feature grid ─────────────────────────────────────────────────────── */
+.features-section { background: var(--paper2); }
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.feature {
+  background: var(--paper2);
+  padding: 40px 36px;
+  transition: background 0.2s;
+}
+.feature:hover { background: var(--paper); }
+
+.feature-num {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.feature-num::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.feature-icon { font-size: 32px; margin-bottom: 16px; }
+
+.feature-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  margin-bottom: 12px;
+}
+
+.feature-desc {
+  font-family: var(--f-serif);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* ── Code section ─────────────────────────────────────────────────────── */
+.code-section {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.code-section .section-tag { color: rgba(245,242,235,0.3); }
+.code-section .section-tag::before { background: rgba(245,242,235,0.3); }
+.code-section .section-title { color: var(--paper); }
+.code-section .section-title em { color: rgba(245,242,235,0.3); }
+
+.code-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 900px) {
+  .code-grid { grid-template-columns: 1fr; }
+}
+
+.code-block {
+  background: rgba(245,242,235,0.04);
+  border: 1px solid rgba(245,242,235,0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(245,242,235,0.08);
+  background: rgba(245,242,235,0.03);
+}
+
+.code-block-title {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: rgba(245,242,235,0.5);
+  letter-spacing: 1px;
+}
+
+.code-dots {
+  display: flex;
+  gap: 6px;
+}
+.code-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+.code-dot:nth-child(1) { background: #ff5f57; }
+.code-dot:nth-child(2) { background: #febc2e; }
+.code-dot:nth-child(3) { background: #28c840; }
+
+pre {
+  padding: 24px 20px;
+  overflow-x: auto;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.t-comment { color: rgba(245,242,235,0.25); }
+.t-key     { color: #79c0ff; }
+.t-str     { color: #a5d6ff; }
+.t-fn      { color: var(--lime); }
+.t-kw      { color: #ff7b72; }
+.t-num     { color: #f5a623; }
+.t-punct   { color: rgba(245,242,235,0.4); }
+.t-var     { color: #ffa657; }
+.t-plain   { color: rgba(245,242,235,0.8); }
+
+.code-insight {
+  margin-top: 24px;
+  background: rgba(212,245,60,0.08);
+  border: 1px solid rgba(212,245,60,0.2);
+  border-radius: 10px;
+  padding: 20px 24px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.code-insight-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+.code-insight-text {
+  font-family: var(--f-serif);
+  font-size: 16px;
+  line-height: 1.5;
+  color: rgba(245,242,235,0.7);
+}
+.code-insight-text strong { color: var(--lime); font-weight: 400; font-style: italic; }
+
+/* ── Timeline / story ─────────────────────────────────────────────────── */
+.story-section { background: var(--paper); }
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-width: 800px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 24px;
+  top: 0; bottom: 0;
+  width: 1px;
+  background: var(--border);
+}
+
+.timeline-item {
+  display: flex;
+  gap: 32px;
+  padding: 32px 0;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.timeline-item:last-child { border-bottom: none; }
+
+.timeline-dot {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  position: relative;
+  z-index: 1;
+  border: 2px solid var(--border);
+  background: var(--paper);
+}
+.timeline-dot.success { background: var(--ink); border-color: var(--ink); }
+.timeline-dot.warn    { background: var(--amber); border-color: var(--amber); }
+.timeline-dot.error   { background: var(--red); border-color: var(--red); }
+
+.timeline-content { flex: 1; padding-top: 8px; }
+.timeline-step {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.timeline-title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  margin-bottom: 10px;
+}
+.timeline-desc {
+  font-family: var(--f-serif);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.timeline-code {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  background: var(--paper3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  color: var(--ink);
+}
+
+/* ── Stack section ────────────────────────────────────────────────────── */
+.stack-section { background: var(--paper2); }
+
+.stack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.stack-card {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 24px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.stack-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 48px rgba(12,13,16,0.08);
+}
+.stack-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+}
+.stack-card.cf::after   { background: #f5821f; }
+.stack-card.gm::after   { background: #4285f4; }
+.stack-card.gh::after   { background: var(--ink); }
+.stack-card.free::after { background: var(--lime2); }
+
+.stack-icon { font-size: 32px; margin-bottom: 14px; }
+.stack-name { font-size: 16px; font-weight: 600; margin-bottom: 6px; letter-spacing: -0.3px; }
+.stack-role {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.stack-desc {
+  font-family: var(--f-serif);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.stack-badge {
+  display: inline-block;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  background: rgba(12,13,16,0.06);
+  padding: 3px 8px;
+  border-radius: 3px;
+  margin-top: 10px;
+}
+.stack-badge.free { background: rgba(184,222,26,0.2); color: #5a7a00; }
+
+/* ── CTA / footer ─────────────────────────────────────────────────────── */
+.cta-section {
+  background: var(--ink);
+  color: var(--paper);
+  text-align: center;
+  padding: 120px 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-section::before {
+  content: '⚡';
+  position: absolute;
+  font-size: 400px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.03;
+  pointer-events: none;
+}
+
+.cta-title {
+  font-size: clamp(40px, 6vw, 80px);
+  font-weight: 700;
+  letter-spacing: -3px;
+  line-height: 1;
+  margin-bottom: 24px;
+}
+.cta-title em {
+  font-family: var(--f-serif);
+  font-style: italic;
+  font-weight: 400;
+  color: rgba(245,242,235,0.35);
+}
+
+.cta-sub {
+  font-family: var(--f-serif);
+  font-size: 20px;
+  color: rgba(245,242,235,0.5);
+  margin-bottom: 48px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.5;
+}
+
+.cta-links {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 80px;
+}
+
+.cta-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 14px 28px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.cta-link.primary {
+  background: var(--lime);
+  color: var(--ink);
+  font-weight: 500;
+}
+.cta-link.primary:hover {
+  background: var(--lime2);
+  transform: translateY(-2px);
+}
+.cta-link.ghost {
+  border: 1px solid rgba(245,242,235,0.2);
+  color: rgba(245,242,235,0.7);
+}
+.cta-link.ghost:hover {
+  border-color: rgba(245,242,235,0.5);
+  color: var(--paper);
+}
+
+footer {
+  border-top: 1px solid rgba(245,242,235,0.08);
+  padding-top: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.footer-left {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: rgba(245,242,235,0.3);
+  letter-spacing: 1px;
+}
+.footer-left span { color: var(--lime); }
+.footer-right {
+  display: flex;
+  gap: 24px;
+}
+.footer-right a {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: rgba(245,242,235,0.3);
+  text-decoration: none;
+  letter-spacing: 1px;
+  transition: color 0.2s;
+}
+.footer-right a:hover { color: rgba(245,242,235,0.7); }
+
+/* ── Animations ───────────────────────────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  nav { padding: 16px 24px; }
+  section { padding: 60px 24px; }
+  .hero { padding: 0 24px 60px; }
+  .hero-card { display: none; }
+  .stats-bar { padding: 32px 24px; }
+  .stats-divider { display: none; }
+  .arch-arrow { display: none; }
+  .arch-node { min-width: 130px; }
+  .cta-section { padding: 80px 24px; }
+  .nav-links { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Custom cursor -->
+<div class="cursor" id="cursor"></div>
+
+<!-- Navigation -->
+<nav id="navbar">
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-icon">⚡</div>
+    Inwood Electricity
+  </a>
+  <ul class="nav-links">
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#code">Code</a></li>
+    <li><a href="#story">Story</a></li>
+    <li><a href="#stack">Stack</a></li>
+    <li><a href="https://inwood-electricity.pages.dev" target="_blank" class="nav-cta">Live Demo →</a></li>
+  </ul>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-bg">
+    <div class="hero-bg-number">59</div>
+
+    <!-- Floating metric cards -->
+    <div class="hero-card card-1">
+      <div class="card-label">PEAK DAY · JUL 6 2025</div>
+      <div class="card-val"><span>59.11</span> kWh</div>
+      <div class="card-sub">3.9× over threshold</div>
+      <div class="card-bar"><div class="card-bar-fill" style="width:100%"></div></div>
+    </div>
+
+    <div class="hero-card card-2">
+      <div class="card-label">MONTHLY RECORD · AUG 2025</div>
+      <div class="card-val"><span>406</span> kWh</div>
+      <div class="card-sub">Monthly threshold exceeded</div>
+      <div class="card-bar"><div class="card-bar-fill" style="width:85%"></div></div>
+    </div>
+
+    <div class="hero-card card-3">
+      <div class="card-label">TOTAL ALERTS PARSED</div>
+      <div class="card-val"><span>200+</span></div>
+      <div class="card-sub">Jun 2025 → May 2026</div>
+      <div class="card-bar"><div class="card-bar-fill" style="width:72%"></div></div>
+    </div>
+  </div>
+
+  <div class="hero-tag">OPEN SOURCE PROJECT</div>
+
+  <h1 class="hero-title reveal">
+    Inwood<br>
+    <span class="line2">Electricity</span><br>
+    <span class="accent">Dashboard</span>
+  </h1>
+
+  <div class="hero-bottom">
+    <p class="hero-desc reveal reveal-delay-1">
+      A <strong>self-updating electricity dashboard</strong> that automatically
+      pulls PSE&G threshold notifications from Gmail, parses kWh readings,
+      and renders live usage trends — with zero servers and zero cost.
+    </p>
+    <div class="hero-actions reveal reveal-delay-2">
+      <a href="https://inwood-electricity.pages.dev" target="_blank" class="btn-primary">
+        ⚡ View Live Dashboard
+      </a>
+      <a href="https://github.com/bstef/inwood-electricity" target="_blank" class="btn-secondary">
+        ⌥ GitHub Repo
+      </a>
+    </div>
+  </div>
+
+  <div class="scroll-hint reveal reveal-delay-3">
+    <span>↓</span> SCROLL TO EXPLORE
+  </div>
+</section>
+
+<!-- Stats bar -->
+<div class="stats-bar">
+  <div class="stat-item reveal">
+    <span class="stat-num">200+</span>
+    <span class="stat-lbl">Emails Parsed</span>
+  </div>
+  <div class="stats-divider"></div>
+  <div class="stat-item reveal reveal-delay-1">
+    <span class="stat-num">59.1</span>
+    <span class="stat-lbl">Peak kWh Day</span>
+  </div>
+  <div class="stats-divider"></div>
+  <div class="stat-item reveal reveal-delay-2">
+    <span class="stat-num">$0</span>
+    <span class="stat-lbl">Monthly Cost</span>
+  </div>
+  <div class="stats-divider"></div>
+  <div class="stat-item reveal reveal-delay-3">
+    <span class="stat-num">6hr</span>
+    <span class="stat-lbl">Cache TTL</span>
+  </div>
+  <div class="stats-divider"></div>
+  <div class="stat-item reveal reveal-delay-4">
+    <span class="stat-num">2</span>
+    <span class="stat-lbl">API Subrequests</span>
+  </div>
+</div>
+
+<!-- Architecture -->
+<section class="arch-section" id="architecture">
+  <div class="section-tag">Architecture</div>
+  <h2 class="section-title reveal">How it <em>all connects</em></h2>
+
+  <div class="arch-flow reveal">
+    <div class="arch-node">
+      <div class="arch-node-icon">📧</div>
+      <div class="arch-node-label">Source</div>
+      <div class="arch-node-name">PSE&G Gmail</div>
+      <div class="arch-node-sub">MyMeter alerts</div>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-node highlight">
+      <div class="arch-node-icon">⚡</div>
+      <div class="arch-node-label">Function</div>
+      <div class="arch-node-name">Pages Worker</div>
+      <div class="arch-node-sub">/api/meter-data</div>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-node">
+      <div class="arch-node-icon">🗄</div>
+      <div class="arch-node-label">Cache</div>
+      <div class="arch-node-name">Cloudflare KV</div>
+      <div class="arch-node-sub">6 hour TTL</div>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-node">
+      <div class="arch-node-icon">📊</div>
+      <div class="arch-node-label">Frontend</div>
+      <div class="arch-node-name">Static HTML</div>
+      <div class="arch-node-sub">No framework</div>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-node">
+      <div class="arch-node-icon">👀</div>
+      <div class="arch-node-label">Output</div>
+      <div class="arch-node-name">Live Dashboard</div>
+      <div class="arch-node-sub">pages.dev URL</div>
+    </div>
+  </div>
+
+  <div class="features-grid reveal reveal-delay-1">
+    <div class="feature">
+      <div class="feature-num">01</div>
+      <div class="feature-icon">🔄</div>
+      <div class="feature-title">Auto-Refreshing</div>
+      <div class="feature-desc">Every page load checks the KV cache. If stale, re-fetches Gmail automatically. New PSE&G emails appear within 6 hours — no manual steps.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-num">02</div>
+      <div class="feature-icon">🚫</div>
+      <div class="feature-title">Zero Infrastructure</div>
+      <div class="feature-desc">No servers. No databases. No cron jobs. Cloudflare Pages serves the static frontend and runs the Function on demand at the edge.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-num">03</div>
+      <div class="feature-icon">⚡</div>
+      <div class="feature-title">Minimal API Calls</div>
+      <div class="feature-desc">Only 2 subrequests per refresh — one OAuth token exchange and one paginated Gmail messages.list. Snippets come inline, no second fetch needed.</div>
+    </div>
+    <div class="feature">
+      <div class="feature-num">04</div>
+      <div class="feature-icon">📈</div>
+      <div class="feature-title">Rich Visualization</div>
+      <div class="feature-desc">Bar chart, monthly summary cards, and a fully sortable, searchable data table — all rendered client-side from a single JSON endpoint.</div>
+    </div>
+  </div>
+</section>
+
+<!-- Code -->
+<section class="code-section" id="code">
+  <div class="section-tag">Code</div>
+  <h2 class="section-title reveal">The <em>key pieces</em></h2>
+
+  <div class="code-grid">
+    <!-- Gmail Parser -->
+    <div class="reveal">
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-dots">
+            <div class="code-dot"></div>
+            <div class="code-dot"></div>
+            <div class="code-dot"></div>
+          </div>
+          <div class="code-block-title">parseReadings() — snippet parser</div>
+        </div>
+        <pre><span class="t-kw">function</span> <span class="t-fn">parseReadings</span><span class="t-punct">(</span><span class="t-var">messages</span><span class="t-punct">) {</span>
+  <span class="t-kw">const</span> <span class="t-var">readings</span> <span class="t-punct">= [];</span>
+
+  <span class="t-kw">for</span> <span class="t-punct">(</span><span class="t-kw">const</span> <span class="t-var">msg</span> <span class="t-kw">of</span> <span class="t-var">messages</span><span class="t-punct">) {</span>
+    <span class="t-kw">const</span> <span class="t-var">s</span> <span class="t-punct">= </span><span class="t-var">msg</span><span class="t-punct">.</span><span class="t-key">snippet</span><span class="t-punct">;</span>
+
+    <span class="t-comment">// "was 21.81 kWh at 05-20-26 12:00"</span>
+    <span class="t-kw">const</span> <span class="t-var">kwh</span>  <span class="t-punct">= </span><span class="t-var">s</span><span class="t-punct">.</span><span class="t-fn">match</span><span class="t-punct">(</span><span class="t-str">/was\s+([\d.]+)\s+kWh/i</span><span class="t-punct">);</span>
+    <span class="t-kw">const</span> <span class="t-var">date</span> <span class="t-punct">= </span><span class="t-var">s</span><span class="t-punct">.</span><span class="t-fn">match</span><span class="t-punct">(</span><span class="t-str">/at\s+(\d{2}-\d{2}-\d{2})/i</span><span class="t-punct">);</span>
+
+    <span class="t-kw">if</span> <span class="t-punct">(!</span><span class="t-var">kwh</span> <span class="t-punct">|| !</span><span class="t-var">date</span><span class="t-punct">) </span><span class="t-kw">continue</span><span class="t-punct">;</span>
+
+    <span class="t-kw">const</span> <span class="t-punct">[</span><span class="t-var">mm</span><span class="t-punct">, </span><span class="t-var">dd</span><span class="t-punct">, </span><span class="t-var">yy</span><span class="t-punct">] = </span><span class="t-var">date</span><span class="t-punct">[</span><span class="t-num">1</span><span class="t-punct">].</span><span class="t-fn">split</span><span class="t-punct">(</span><span class="t-str">'-'</span><span class="t-punct">);</span>
+    <span class="t-var">readings</span><span class="t-punct">.</span><span class="t-fn">push</span><span class="t-punct">({</span>
+      <span class="t-key">date</span><span class="t-punct">: </span><span class="t-str">`20${</span><span class="t-var">yy</span><span class="t-str">}-${</span><span class="t-var">mm</span><span class="t-str">}-${</span><span class="t-var">dd</span><span class="t-str">}`</span><span class="t-punct">,</span>
+      <span class="t-key">kwh</span><span class="t-punct">:  </span><span class="t-fn">parseFloat</span><span class="t-punct">(</span><span class="t-var">kwh</span><span class="t-punct">[</span><span class="t-num">1</span><span class="t-punct">]),</span>
+      <span class="t-key">type</span><span class="t-punct">: </span><span class="t-fn">detectType</span><span class="t-punct">(</span><span class="t-var">s</span><span class="t-punct">),</span>
+    <span class="t-punct">});</span>
+  <span class="t-punct">}</span>
+  <span class="t-kw">return</span> <span class="t-var">readings</span><span class="t-punct">;</span>
+<span class="t-punct">}</span></pre>
+      </div>
+      <div class="code-insight">
+        <div class="code-insight-icon">💡</div>
+        <div class="code-insight-text">
+          PSE&G emails follow a <strong>consistent machine-generated format</strong> — two regexes extract everything needed from the snippet alone. No need to fetch the full email body.
+        </div>
+      </div>
+    </div>
+
+    <!-- KV Cache + OAuth -->
+    <div class="reveal reveal-delay-1">
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-dots">
+            <div class="code-dot"></div>
+            <div class="code-dot"></div>
+            <div class="code-dot"></div>
+          </div>
+          <div class="code-block-title">onRequestGet() — cache + fetch</div>
+        </div>
+        <pre><span class="t-kw">export async function</span> <span class="t-fn">onRequestGet</span><span class="t-punct">({ </span><span class="t-var">env</span><span class="t-punct">, </span><span class="t-var">request</span><span class="t-punct"> }) {</span>
+  <span class="t-kw">const</span> <span class="t-var">refresh</span> <span class="t-punct">= </span><span class="t-var">url</span><span class="t-punct">.</span><span class="t-fn">searchParams</span>
+    <span class="t-punct">.</span><span class="t-fn">get</span><span class="t-punct">(</span><span class="t-str">'refresh'</span><span class="t-punct">) === </span><span class="t-str">'1'</span><span class="t-punct">;</span>
+
+  <span class="t-comment">// 1. Check KV cache (6hr TTL)</span>
+  <span class="t-kw">if</span> <span class="t-punct">(!</span><span class="t-var">refresh</span><span class="t-punct">) {</span>
+    <span class="t-kw">const</span> <span class="t-var">cached</span> <span class="t-punct">= </span><span class="t-kw">await</span> <span class="t-var">env</span><span class="t-punct">.</span><span class="t-key">KV_METER_DATA</span>
+      <span class="t-punct">.</span><span class="t-fn">get</span><span class="t-punct">(</span><span class="t-var">CACHE_KEY</span><span class="t-punct">, { </span><span class="t-key">type</span><span class="t-punct">: </span><span class="t-str">'json'</span><span class="t-punct"> });</span>
+    <span class="t-kw">if</span> <span class="t-punct">(</span><span class="t-var">cached</span> <span class="t-punct">&& !</span><span class="t-fn">isStale</span><span class="t-punct">(</span><span class="t-var">cached</span><span class="t-punct">))</span>
+      <span class="t-kw">return</span> <span class="t-fn">respond</span><span class="t-punct">({ ...</span><span class="t-var">cached</span><span class="t-punct">, </span><span class="t-key">source</span><span class="t-punct">: </span><span class="t-str">'cache'</span><span class="t-punct"> });</span>
+  <span class="t-punct">}</span>
+
+  <span class="t-comment">// 2. OAuth2 token exchange</span>
+  <span class="t-kw">const</span> <span class="t-var">token</span> <span class="t-punct">= </span><span class="t-kw">await</span> <span class="t-fn">getAccessToken</span><span class="t-punct">(</span><span class="t-var">env</span><span class="t-punct">);</span>
+
+  <span class="t-comment">// 3. Fetch + parse Gmail messages</span>
+  <span class="t-kw">const</span> <span class="t-var">msgs</span>     <span class="t-punct">= </span><span class="t-kw">await</span> <span class="t-fn">fetchMessageList</span><span class="t-punct">(</span><span class="t-var">token</span><span class="t-punct">);</span>
+  <span class="t-kw">const</span> <span class="t-var">readings</span> <span class="t-punct">= </span><span class="t-fn">parseReadings</span><span class="t-punct">(</span><span class="t-var">msgs</span><span class="t-punct">);</span>
+
+  <span class="t-comment">// 4. Write to KV cache</span>
+  <span class="t-kw">await</span> <span class="t-var">env</span><span class="t-punct">.</span><span class="t-key">KV_METER_DATA</span><span class="t-punct">.</span><span class="t-fn">put</span><span class="t-punct">(</span>
+    <span class="t-var">CACHE_KEY</span><span class="t-punct">, </span><span class="t-fn">JSON</span><span class="t-punct">.</span><span class="t-fn">stringify</span><span class="t-punct">(</span><span class="t-var">payload</span><span class="t-punct">),</span>
+    <span class="t-punct">{ </span><span class="t-key">expirationTtl</span><span class="t-punct">: </span><span class="t-num">21600</span><span class="t-punct"> }</span>
+  <span class="t-punct">);</span>
+<span class="t-punct">}</span></pre>
+      </div>
+      <div class="code-insight">
+        <div class="code-insight-icon">🔑</div>
+        <div class="code-insight-text">
+          The <strong>refresh token lives as an encrypted secret</strong> in Cloudflare — never in the repo. A single OAuth exchange gives a short-lived access token used only for that request.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Story / Timeline -->
+<section class="story-section" id="story">
+  <div class="section-tag">Build Story</div>
+  <h2 class="section-title reveal">The road <em>to working</em></h2>
+
+  <div class="timeline">
+    <div class="timeline-item reveal">
+      <div class="timeline-dot success">💡</div>
+      <div class="timeline-content">
+        <div class="timeline-step">STEP 01 · IDEA</div>
+        <div class="timeline-title">200 emails, zero visibility</div>
+        <div class="timeline-desc">A year of PSE&G threshold notifications sat unread in Gmail. The data was there — date, kWh, threshold type — in every single snippet. Just needed a bridge to make it visible.</div>
+      </div>
+    </div>
+
+    <div class="timeline-item reveal">
+      <div class="timeline-dot success">🏗</div>
+      <div class="timeline-content">
+        <div class="timeline-step">STEP 02 · ARCHITECTURE</div>
+        <div class="timeline-title">Cloudflare Pages + KV + Gmail API</div>
+        <div class="timeline-desc">Static HTML dashboard, a Pages Function as the API layer, KV for caching. Zero servers. The whole stack runs at the edge for free.</div>
+      </div>
+    </div>
+
+    <div class="timeline-item reveal">
+      <div class="timeline-dot warn">⚠️</div>
+      <div class="timeline-content">
+        <div class="timeline-step">STEP 03 · FIRST BLOCKER</div>
+        <div class="timeline-title">Workers vs Pages confusion</div>
+        <div class="timeline-desc">Cloudflare's new unified UI merges Workers and Pages — creating a Worker instead of a Pages project served hello world instead of the dashboard. The fix was buried at the bottom of the create screen.</div>
+        <div class="timeline-code">"Looking to deploy Pages? Get started" ← that link</div>
+      </div>
+    </div>
+
+    <div class="timeline-item reveal">
+      <div class="timeline-dot warn">🚫</div>
+      <div class="timeline-content">
+        <div class="timeline-step">STEP 04 · DEPLOY COMMAND HELL</div>
+        <div class="timeline-title">The UI requires a deploy command it shouldn't need</div>
+        <div class="timeline-desc">Pages handles deployment automatically via GitHub integration. But the new UI forces a deploy command. The workaround that finally worked:</div>
+        <div class="timeline-code">Deploy command: echo "deploy"</div>
+      </div>
+    </div>
+
+    <div class="timeline-item reveal">
+      <div class="timeline-dot error">🐛</div>
+      <div class="timeline-content">
+        <div class="timeline-step">STEP 05 · THE BUG</div>
+        <div class="timeline-title">Gmail batch API silently fails above 100 requests</div>
+        <div class="timeline-desc">The original approach sent all 200+ message IDs to Gmail's batch API in one request. Gmail's batch limit is 100 — exceed it and it returns nothing, no error. Zero emails parsed. Zero readings.</div>
+      </div>
+    </div>
+
+    <div class="timeline-item reveal">
+      <div class="timeline-dot success">✅</div>
+      <div class="timeline-content">
+        <div class="timeline-step">STEP 06 · THE FIX</div>
+        <div class="timeline-title">messages.list already includes snippets</div>
+        <div class="timeline-desc">The batch API was never needed. Gmail's messages.list response already contains the snippet for each message inline. One API call, all the data. Dropped from 100+ subrequests to 2.</div>
+        <div class="timeline-code">messages.list?q=from:MyMeter@email.pseg.com&maxResults=500</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Stack -->
+<section class="stack-section" id="stack">
+  <div class="section-tag">Tech Stack</div>
+  <h2 class="section-title reveal">Built <em>with</em></h2>
+
+  <div class="stack-grid">
+    <div class="stack-card cf reveal">
+      <div class="stack-icon">☁️</div>
+      <div class="stack-name">Cloudflare Pages</div>
+      <div class="stack-role">Hosting + Serverless</div>
+      <div class="stack-desc">Serves the static dashboard and runs the API function at the edge globally.</div>
+      <div class="stack-badge free">Free Tier</div>
+    </div>
+
+    <div class="stack-card cf reveal reveal-delay-1">
+      <div class="stack-icon">🗄</div>
+      <div class="stack-name">Cloudflare KV</div>
+      <div class="stack-role">Cache Layer</div>
+      <div class="stack-desc">Globally distributed key-value store. Caches parsed Gmail data for 6 hours per request.</div>
+      <div class="stack-badge free">Free Tier</div>
+    </div>
+
+    <div class="stack-card gm reveal reveal-delay-2">
+      <div class="stack-icon">📧</div>
+      <div class="stack-name">Gmail API</div>
+      <div class="stack-role">Data Source</div>
+      <div class="stack-desc">OAuth2 refresh token flow. messages.list with snippets — no per-message fetches needed.</div>
+      <div class="stack-badge">google.com/apis</div>
+    </div>
+
+    <div class="stack-card gh reveal reveal-delay-3">
+      <div class="stack-icon">🐙</div>
+      <div class="stack-name">GitHub</div>
+      <div class="stack-role">CI/CD</div>
+      <div class="stack-desc">Push to main → Cloudflare auto-deploys. Every commit is a production deploy.</div>
+      <div class="stack-badge">bstef/inwood-electricity</div>
+    </div>
+
+    <div class="stack-card reveal reveal-delay-1">
+      <div class="stack-icon">📄</div>
+      <div class="stack-name">Vanilla HTML/CSS/JS</div>
+      <div class="stack-role">Frontend</div>
+      <div class="stack-desc">No framework. No build step. Single index.html file with charts, table, and filters.</div>
+      <div class="stack-badge free">Zero Dependencies</div>
+    </div>
+
+    <div class="stack-card reveal reveal-delay-2">
+      <div class="stack-icon">🤖</div>
+      <div class="stack-name">Claude + Claude Code</div>
+      <div class="stack-role">AI-Assisted Dev</div>
+      <div class="stack-desc">Built with AI pair programming — from initial design to diagnosing the Gmail batch API bug.</div>
+      <div class="stack-badge">anthropic.com</div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <h2 class="cta-title reveal">
+    See it<br><em>live</em>
+  </h2>
+  <p class="cta-sub reveal reveal-delay-1">
+    The dashboard updates automatically every 6 hours from live Gmail data.
+  </p>
+  <div class="cta-links reveal reveal-delay-2">
+    <a href="https://inwood-electricity.pages.dev" target="_blank" class="cta-link primary">
+      ⚡ Open Dashboard
+    </a>
+    <a href="https://github.com/bstef/inwood-electricity" target="_blank" class="cta-link ghost">
+      ⌥ View Source
+    </a>
+    <a href="https://hashnode.com" target="_blank" class="cta-link ghost">
+      ✍ Read Blog Post
+    </a>
+  </div>
+
+  <footer>
+    <div class="footer-left">
+      <span>Inwood Electricity</span> · Built by Bobby Stef ·
+      <span>Peacock Engineering</span>
+    </div>
+    <div class="footer-right">
+      <a href="https://peacockengr.com" target="_blank">peacockengr.com</a>
+      <a href="https://github.com/bstef" target="_blank">github.com/bstef</a>
+      <a href="https://linkedin.com" target="_blank">LinkedIn</a>
+    </div>
+  </footer>
+</section>
+
+<script>
+// ── Custom cursor ──────────────────────────────────────────────────────────────
+const cursor = document.getElementById('cursor');
+document.addEventListener('mousemove', e => {
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top  = e.clientY + 'px';
+});
+document.querySelectorAll('a, button').forEach(el => {
+  el.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+  el.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+});
+
+// ── Navbar scroll ──────────────────────────────────────────────────────────────
+window.addEventListener('scroll', () => {
+  document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 40);
+});
+
+// ── Scroll reveal ──────────────────────────────────────────────────────────────
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// ── Animate stat numbers ───────────────────────────────────────────────────────
+function animateNumber(el, target, suffix = '', decimals = 0) {
+  const duration = 1400;
+  const start = performance.now();
+  const from = 0;
+
+  function update(now) {
+    const progress = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const val = from + (target - from) * eased;
+    el.textContent = decimals > 0
+      ? val.toFixed(decimals) + suffix
+      : Math.round(val) + suffix;
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
+
+const statObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    const nums = [
+      { el: document.querySelectorAll('.stat-num')[0], val: 200, suffix: '+' },
+      { el: document.querySelectorAll('.stat-num')[1], val: 59.1, suffix: '', dec: 1 },
+      { el: document.querySelectorAll('.stat-num')[2], val: 0, suffix: '$', prefix: '$' },
+      { el: document.querySelectorAll('.stat-num')[3], val: 6, suffix: 'hr' },
+      { el: document.querySelectorAll('.stat-num')[4], val: 2, suffix: '' },
+    ];
+    nums.forEach(n => {
+      if (n.el) animateNumber(n.el, n.val, n.suffix, n.dec || 0);
+    });
+    statObserver.disconnect();
+  });
+}, { threshold: 0.5 });
+
+const statsBar = document.querySelector('.stats-bar');
+if (statsBar) statObserver.observe(statsBar);
+</script>
+</body>
+</html>
